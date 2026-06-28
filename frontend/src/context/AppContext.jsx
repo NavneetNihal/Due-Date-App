@@ -7,230 +7,108 @@ import { useOwnerActions } from './ownerActions.js';
 
 export const AppContext = createContext();
 
-// Re-export helpers so components importing them from AppContext.jsx still work
 export { formatDate, addDays };
 
 export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('owner_user');
-    if (!savedUser) return null;
-    const parsedUser = JSON.parse(savedUser);
-    if (parsedUser && parsedUser.subscriptionStatus === undefined) {
-      parsedUser.subscriptionStatus = 'active';
-      parsedUser.subscriptionDueDate = addDays(formatDate(new Date()), 30);
-      parsedUser.graceDaysRemaining = 10;
-      parsedUser.billingPayments = [];
-      localStorage.setItem('owner_user', JSON.stringify(parsedUser));
-    }
-    if (parsedUser && (parsedUser.pricingPlan === undefined || parsedUser.pricingPlan === 'starter' || parsedUser.pricingPlan === 'growth')) {
-      parsedUser.pricingPlan = 'basic';
-      localStorage.setItem('owner_user', JSON.stringify(parsedUser));
-    }
-    return parsedUser;
+    return savedUser ? JSON.parse(savedUser) : null;
   });
 
-  const [members, setMembers] = useState(() => {
-    const savedMembers = localStorage.getItem('gym_members_v5');
-    const parsed = savedMembers ? JSON.parse(savedMembers) : [];
-    return parsed.filter(m => !m.id.includes('mock') && m.id !== 'm1' && m.id !== 'm2' && m.id !== 'm3');
-  });
+  const [members, setMembers] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [developerSettings, setDeveloperSettings] = useState({ upiId: '7004689533@ptyes', qrCode: '' });
+  const [gymOwners, setGymOwners] = useState([]);
+  const [billingRequests, setBillingRequests] = useState([]);
+  const [activeOutletId, setActiveOutletId] = useState('owner_golds');
+  const [loading, setLoading] = useState(false);
 
-  const [payments, setPayments] = useState(() => {
-    const savedPayments = localStorage.getItem('gym_payments_v5');
-    const savedMembers = localStorage.getItem('gym_members_v5');
-    const parsedMembers = savedMembers ? JSON.parse(savedMembers) : [];
-    const filteredMembers = parsedMembers.filter(m => !m.id.includes('mock') && m.id !== 'm1' && m.id !== 'm2' && m.id !== 'm3');
-    const memberIds = new Set(filteredMembers.map(m => m.id));
-    const parsedPayments = savedPayments ? JSON.parse(savedPayments) : [];
-    return parsedPayments.filter(p => !p.memberId || memberIds.has(p.memberId));
-  });
-
-  const [developerSettings, setDeveloperSettings] = useState(() => {
-    const savedDev = localStorage.getItem('developer_settings_v2') || localStorage.getItem('developer_settings_v1');
-    if (savedDev) {
-      const parsed = JSON.parse(savedDev);
-      if (parsed.upiId === 'nihal.lakra@okaxis') {
-        parsed.upiId = '7004689533@ptyes';
+  // Load Developer settings (checkout coordinates) from backend on mount
+  useEffect(() => {
+    const fetchDevSettings = async () => {
+      try {
+        const response = await fetch('http://localhost:5001/api/creator/settings');
+        if (response.ok) {
+          const settingsData = await response.json();
+          setDeveloperSettings(settingsData);
+        }
+      } catch (err) {
+        console.error('Fetch developer settings error:', err);
       }
-      if (parsed.bankName === undefined) {
-        parsed.bankName = 'YES BANK';
-        parsed.cardNumber = '4111 2222 3333 7004';
-        parsed.cardHolder = 'Navneet Nihal Lakra';
-        parsed.cardExpiry = '12/32';
-      }
-      if (parsed.cardHolder && parsed.cardHolder.toLowerCase() === 'nihal lakra') {
-        parsed.cardHolder = 'Navneet Nihal Lakra';
-      }
-      localStorage.setItem('developer_settings_v2', JSON.stringify(parsed));
-      return parsed;
-    }
-    return {
-      upiId: '7004689533@ptyes',
-      qrCode: '',
-      bankName: 'YES BANK',
-      cardNumber: '4111 2222 3333 7004',
-      cardHolder: 'Navneet Nihal Lakra',
-      cardExpiry: '12/32'
     };
-  });
-
-  const [gymOwners, setGymOwners] = useState(() => {
-    const savedOwners = localStorage.getItem('gym_owners_registry_v3');
-    const parsed = savedOwners ? JSON.parse(savedOwners) : [];
-    const mockIds = new Set(['owner_golds', 'owner_spartan', 'owner_iron', 'owner_titanium']);
-    const cleanOwners = parsed.filter(o => !mockIds.has(o.id)).map(owner => {
-      let changed = false;
-      let nameVal = owner.name;
-      if (owner.name && owner.name.toLowerCase() === 'nihal lakra') {
-        nameVal = 'Navneet Nihal Lakra';
-        changed = true;
-      }
-      if (owner.pricingPlan !== 'basic') {
-        owner.pricingPlan = 'basic';
-        changed = true;
-      }
-      let dueDateVal = owner.subscriptionDueDate;
-      if (!dueDateVal) {
-        changed = true;
-        const todayStr = formatDate(new Date());
-        if (owner.subscriptionStatus === 'active') {
-          dueDateVal = addDays(owner.lastPaymentDate && owner.lastPaymentDate !== 'N/A' ? owner.lastPaymentDate : todayStr, 30);
-        } else if (owner.subscriptionStatus === 'overdue') {
-          dueDateVal = addDays(todayStr, -3); // 3 days overdue
-        } else if (owner.subscriptionStatus === 'revoked') {
-          dueDateVal = addDays(todayStr, -15); // 15 days overdue (revoked)
-        } else {
-          dueDateVal = addDays(todayStr, 30);
-        }
-      }
-      if (changed) {
-        return { ...owner, name: nameVal, pricingPlan: owner.pricingPlan, subscriptionDueDate: dueDateVal };
-      }
-      return owner;
-    });
-    return cleanOwners;
-  });
-
-  const [billingRequests, setBillingRequests] = useState(() => {
-    const saved = localStorage.getItem('billing_requests_v1');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [activeOutletId, setActiveOutletId] = useState(() => {
-    return localStorage.getItem('active_outlet_id') || 'owner_golds';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('active_outlet_id', activeOutletId);
-  }, [activeOutletId]);
-
-  // Sync to localStorage
-  useEffect(() => {
-    localStorage.setItem('gym_members_v5', JSON.stringify(members));
-  }, [members]);
-
-  useEffect(() => {
-    localStorage.setItem('gym_payments_v5', JSON.stringify(payments));
-  }, [payments]);
-
-  useEffect(() => {
-    localStorage.setItem('developer_settings_v2', JSON.stringify(developerSettings));
-  }, [developerSettings]);
-
-  useEffect(() => {
-    localStorage.setItem('gym_owners_registry_v3', JSON.stringify(gymOwners));
-  }, [gymOwners]);
-
-  // One-time data wipe: clear all legacy keys and reset ledgers to blank slate
-  useEffect(() => {
-    const resetDone = localStorage.getItem('app_data_reset_v4');
-    if (!resetDone) {
-      [
-        'gym_payments_v3', 'gym_payments_v4', 'gym_payments_v5',
-        'gym_members_v3', 'gym_members_v4',
-        'gym_owners_registry_v1', 'gym_owners_registry_v2',
-        'developer_settings_v1',
-        'app_data_reset_v3'
-      ].forEach(k => localStorage.removeItem(k));
-
-      setPayments([]);
-      localStorage.setItem('gym_payments_v5', JSON.stringify([]));
-
-      setGymOwners(prev => {
-        const wiped = prev.map(owner => ({
-          ...owner,
-          totalPaidToCreator: 0,
-          lastPaymentDate: 'N/A',
-          paymentsHistory: []
-        }));
-        localStorage.setItem('gym_owners_registry_v3', JSON.stringify(wiped));
-        return wiped;
-      });
-
-      localStorage.setItem('app_data_reset_v4', 'done');
-    } else {
-      setPayments(prev => {
-        const clean = prev.filter(p => p.amountPaid > 0);
-        if (clean.length !== prev.length) {
-          localStorage.setItem('gym_payments_v5', JSON.stringify(clean));
-          return clean;
-        }
-        return prev;
-      });
-      setGymOwners(prev => {
-        let changed = false;
-        const clean = prev.map(owner => {
-          const cleanHistory = (owner.paymentsHistory || []).filter(p => p.amountPaid > 0);
-          if (cleanHistory.length !== (owner.paymentsHistory || []).length) {
-            changed = true;
-            const newTotal = cleanHistory.reduce((s, p) => s + p.amountPaid, 0);
-            const newLast = cleanHistory.length > 0 ? cleanHistory[0].paymentDate : 'N/A';
-            return { ...owner, paymentsHistory: cleanHistory, totalPaidToCreator: newTotal, lastPaymentDate: newLast };
-          }
-          return owner;
-        });
-        if (changed) localStorage.setItem('gym_owners_registry_v3', JSON.stringify(clean));
-        return changed ? clean : prev;
-      });
-    }
+    fetchDevSettings();
   }, []);
 
-  // Initialize modular hook instances
-  const authActions = useAuthActions(user, setUser, gymOwners, setGymOwners);
-  const paymentActions = usePaymentActions(members, setMembers, payments, setPayments, activeOutletId, setUser);
-  const memberActions = useMemberActions(members, setMembers, activeOutletId, setPayments, setUser, paymentActions.addPaymentRecord);
-  const ownerActions = useOwnerActions(user, setUser, gymOwners, setGymOwners, billingRequests, setBillingRequests, activeOutletId, setActiveOutletId);
-
-  // Automatic subscription status check based on due dates
+  // Sync state data from API when authenticated user changes
   useEffect(() => {
-    if (user && user.subscriptionDueDate) {
-      // If manually revoked by creator, do not auto-override back to overdue/active
-      if (user.subscriptionStatus === 'revoked') {
-        return;
-      }
+    const fetchFreshData = async () => {
+      const token = localStorage.getItem('jwt_token');
+      if (!token || !user) return;
 
-      const todayDate = new Date(formatDate(new Date()));
-      const dueDate = new Date(user.subscriptionDueDate);
-      
-      if (todayDate > dueDate) {
-        const diffTime = Math.abs(todayDate - dueDate);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        const graceLeft = Math.max(0, 10 - diffDays);
-        
-        if (user.subscriptionStatus !== 'overdue' || user.graceDaysRemaining !== graceLeft) {
-          authActions.updateOwnerSubscription('overdue', user.subscriptionDueDate, graceLeft);
+      setLoading(true);
+      try {
+        // Fetch Profile
+        const profileResp = await fetch('http://localhost:5001/api/auth/profile', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (profileResp.ok) {
+          const userData = await profileResp.json();
+          const userWithId = { ...userData, id: userData.id || userData._id };
+          setUser(userWithId);
+          localStorage.setItem('owner_user', JSON.stringify(userWithId));
+
+          if (userData.role === 'creator') {
+            // Load platform clients (gyms list)
+            const clientsResp = await fetch('http://localhost:5001/api/creator/clients', {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (clientsResp.ok) {
+              const clientsData = await clientsResp.json();
+              setGymOwners(clientsData.map(c => ({ ...c, id: c._id || c.id })));
+            }
+
+            // Load billing receipts history
+            const ledgerResp = await fetch('http://localhost:5001/api/creator/ledger', {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (ledgerResp.ok) {
+              const ledgerData = await ledgerResp.json();
+              setBillingRequests(ledgerData.logs.map(r => ({ ...r, id: r._id || r.id })));
+            }
+          } else {
+            // Load members
+            const membersResp = await fetch(`http://localhost:5001/api/members?gymId=${activeOutletId}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (membersResp.ok) {
+              const membersData = await membersResp.json();
+              setMembers(membersData.map(m => ({ ...m, id: m._id || m.id })));
+            }
+
+            // Load accounting payments history
+            const paymentsResp = await fetch(`http://localhost:5001/api/payments?gymId=${activeOutletId}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (paymentsResp.ok) {
+              const paymentsData = await paymentsResp.json();
+              setPayments(paymentsData.map(p => ({ ...p, id: p._id || p.id })));
+            }
+          }
         }
-      } else {
-        if (user.subscriptionStatus !== 'active') {
-          authActions.updateOwnerSubscription('active', user.subscriptionDueDate, 10);
-        }
+      } catch (err) {
+        console.error('Initial async data fetch error:', err);
+      } finally {
+        setLoading(false);
       }
-    }
-  }, [members.length, user?.subscriptionDueDate, user?.subscriptionStatus]);
+    };
+
+    fetchFreshData();
+  }, [user?.id, activeOutletId]);
 
   // Synchronize current logged-in owner user state with registry updates from creator dashboard
   useEffect(() => {
-    if (user && user.role === 'owner' && gymOwners.length > 0) {
+    const token = localStorage.getItem('jwt_token');
+    if (user && user.role === 'owner' && gymOwners.length > 0 && token) {
       const ownerEntry = gymOwners.find(o => o.id === user.id || o.name === user.name || o.email === user.email);
       if (ownerEntry) {
         if (
@@ -256,11 +134,33 @@ export const AppProvider = ({ children }) => {
     }
   }, [gymOwners, user]);
 
-  const updateDeveloperSettings = (newDevSettings) => {
-    setDeveloperSettings(prev => ({
-      ...prev,
-      ...newDevSettings
-    }));
+  // Initialize modular hook actions
+  const authActions = useAuthActions(user, setUser, gymOwners, setGymOwners);
+  const paymentActions = usePaymentActions(members, setMembers, payments, setPayments, activeOutletId, setUser);
+  const memberActions = useMemberActions(members, setMembers, activeOutletId, setPayments, setUser, paymentActions.addPaymentRecord);
+  const ownerActions = useOwnerActions(user, setUser, gymOwners, setGymOwners, billingRequests, setBillingRequests, activeOutletId, setActiveOutletId);
+
+  const updateDeveloperSettings = async (newDevSettings) => {
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return false;
+    try {
+      const response = await fetch('http://localhost:5001/api/creator/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newDevSettings)
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setDeveloperSettings(data.settings);
+        return true;
+      }
+    } catch (err) {
+      console.error('Update developer settings error:', err);
+    }
+    return false;
   };
 
   return (
@@ -273,6 +173,7 @@ export const AppProvider = ({ children }) => {
       activeOutletId,
       gymOwners,
       billingRequests,
+      loading,
       setActiveOutletId,
       updateDeveloperSettings,
       ...authActions,

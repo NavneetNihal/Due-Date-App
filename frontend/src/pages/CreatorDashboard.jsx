@@ -64,10 +64,6 @@ function CreatorDashboard() {
   // Creator credentials edit state
   const [devUpiId, setDevUpiId] = useState(developerSettings?.upiId || '7004689533@ptyes');
   const [devQrCode, setDevQrCode] = useState(developerSettings?.qrCode || '');
-  const [devBankName, setDevBankName] = useState(developerSettings?.bankName || 'YES BANK');
-  const [devCardNumber, setDevCardNumber] = useState(developerSettings?.cardNumber || '4111 2222 3333 7004');
-  const [devCardHolder, setDevCardHolder] = useState(developerSettings?.cardHolder || 'Navneet Nihal Lakra');
-  const [devCardExpiry, setDevCardExpiry] = useState(developerSettings?.cardExpiry || '12/32');
   const [devSavedSuccess, setDevSavedSuccess] = useState(false);
   const [devError, setDevError] = useState('');
   const [ledgerSearch, setLedgerSearch] = useState('');
@@ -80,10 +76,6 @@ function CreatorDashboard() {
     if (developerSettings) {
       setDevUpiId(developerSettings.upiId || '7004689533@ptyes');
       setDevQrCode(developerSettings.qrCode || '');
-      setDevBankName(developerSettings.bankName || 'YES BANK');
-      setDevCardNumber(developerSettings.cardNumber || '4111 2222 3333 7004');
-      setDevCardHolder(developerSettings.cardHolder || 'Navneet Nihal Lakra');
-      setDevCardExpiry(developerSettings.cardExpiry || '12/32');
     }
   }, [developerSettings]);
 

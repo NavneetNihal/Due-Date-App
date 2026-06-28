@@ -10,367 +10,231 @@ export const useOwnerActions = (
   activeOutletId,
   setActiveOutletId
 ) => {
-  const updateGymOwnerStatus = (ownerId, newStatus, newPlan, newAllowedGyms) => {
-    setGymOwners(prev => {
-      const targetOwner = prev.find(o => o.id === ownerId);
-      if (!targetOwner) return prev;
-
-      const todayStr = formatDate(new Date());
-      const updated = prev.map(owner => {
-        if (owner.id === ownerId || (targetOwner && owner.name === targetOwner.name && owner.name !== '')) {
-          let updatedOwner = { ...owner };
-          if (newStatus) {
-            updatedOwner.subscriptionStatus = newStatus;
-            
-            // Adjust subscriptionDueDate to match manual simulation status
-            if (newStatus === 'active') {
-              const currentDue = owner.subscriptionDueDate ? new Date(owner.subscriptionDueDate) : null;
-              const todayVal = new Date(todayStr);
-              if (!currentDue || currentDue <= todayVal) {
-                updatedOwner.subscriptionDueDate = addDays(todayStr, 30);
-              }
-            } else if (newStatus === 'overdue') {
-              updatedOwner.subscriptionDueDate = addDays(todayStr, -3); // 3 days overdue
-            } else if (newStatus === 'revoked') {
-              updatedOwner.subscriptionDueDate = addDays(todayStr, -15); // 15 days overdue (revoked)
-            }
-          }
-          if (newPlan) {
-            updatedOwner.pricingPlan = newPlan;
-          }
-          if (newAllowedGyms !== undefined && newAllowedGyms !== null) {
-            updatedOwner.allowedGyms = newAllowedGyms;
-          }
-          return updatedOwner;
-        }
-        return owner;
+  const updateGymOwnerStatus = async (ownerId, newStatus, newPlan, newAllowedGyms) => {
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return false;
+    try {
+      const response = await fetch(`http://localhost:5001/api/creator/clients/${ownerId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: newStatus,
+          pricingPlan: newPlan,
+          allowedGyms: newAllowedGyms
+        })
       });
-      localStorage.setItem('gym_owners_registry_v3', JSON.stringify(updated));
-      return updated;
-    });
-  };
 
-  const markGymOwnerPaid = (ownerId) => {
-    setGymOwners(prev => {
-      const todayStr = formatDate(new Date());
-      const updated = prev.map(owner => {
-        if (owner.id === ownerId) {
-          const amount = 699;
-          const newPayment = {
-            id: 'op_' + Date.now(),
-            amountPaid: amount,
-            paymentDate: todayStr
-          };
-          const history = owner.paymentsHistory || (
-            owner.totalPaidToCreator > 0 
-              ? Array.from({ length: Math.floor(owner.totalPaidToCreator / amount) }).map((_, i) => ({
-                  id: `op_mock_${owner.id}_${i}`,
-                  amountPaid: amount,
-                  paymentDate: owner.lastPaymentDate || todayStr
-                }))
-              : []
-          );
-
-          // Calculate next subscription due date
-          const currentDueDate = owner.subscriptionDueDate || todayStr;
-          const isOverdue = owner.subscriptionStatus === 'overdue' || owner.subscriptionStatus === 'revoked' || new Date(currentDueDate) < new Date(todayStr);
-          const baseDate = isOverdue ? todayStr : currentDueDate;
-          const newDueDate = addDays(baseDate, 30);
-
-          return {
-            ...owner,
-            subscriptionStatus: 'active',
-            subscriptionDueDate: newDueDate,
-            totalPaidToCreator: owner.totalPaidToCreator + amount,
-            lastPaymentDate: todayStr,
-            paymentsHistory: [newPayment, ...history]
-          };
-        }
-        return owner;
-      });
-      localStorage.setItem('gym_owners_registry_v3', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const reverseGymOwnerPayment = (ownerId) => {
-    setGymOwners(prev => {
-      const updated = prev.map(owner => {
-        if (owner.id === ownerId) {
-          const history = owner.paymentsHistory || [];
-
-          // Find the most recent positive (non-reversed) payment to remove
-          const latestIdx = [...history].findIndex(
-            p => p.amountPaid > 0 && !history.some(rev => rev.reversesPaymentId === p.id)
-          );
-
-          if (latestIdx === -1) return owner; // nothing to undo
-
-          // Remove that entry cleanly
-          const newHistory = history.filter((_, i) => i !== latestIdx);
-          const amount = 699;
-          const newTotal = Math.max(0, owner.totalPaidToCreator - amount);
-
-          // Recompute lastPaymentDate from remaining positive entries
-          const remaining = newHistory.filter(p => p.amountPaid > 0);
-          const nextLastPaymentDate = remaining.length > 0 ? remaining[0].paymentDate : 'N/A';
-
-          // Subtract 30 days from due date and recalculate status
-          const todayStr = formatDate(new Date());
-          const currentDueDate = owner.subscriptionDueDate || todayStr;
-          const newDueDate = addDays(currentDueDate, -30);
-
-          let newStatus = 'active';
-          const todayDate = new Date(todayStr);
-          const parsedNewDueDate = new Date(newDueDate);
-          if (todayDate > parsedNewDueDate) {
-            const diffDays = Math.ceil(Math.abs(todayDate - parsedNewDueDate) / (1000 * 60 * 60 * 24));
-            newStatus = diffDays > 10 ? 'revoked' : 'overdue';
-          }
-
-          return {
-            ...owner,
-            subscriptionStatus: newStatus,
-            subscriptionDueDate: newDueDate,
-            totalPaidToCreator: newTotal,
-            lastPaymentDate: nextLastPaymentDate,
-            paymentsHistory: newHistory
-          };
-        }
-        return owner;
-      });
-      localStorage.setItem('gym_owners_registry_v3', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const deleteGymOwner = (ownerId) => {
-    setGymOwners(prev => {
-      const updated = prev.filter(o => o.id !== ownerId);
-      localStorage.setItem('gym_owners_registry_v3', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const addGymOwner = (ownerData) => {
-    const newId = 'owner_' + Date.now();
-    const isOwnerRole = user && user.role === 'owner';
-    const newOwner = {
-      id: newId,
-      name: ownerData.ownerName || user?.name || 'Navneet Nihal Lakra',
-      businessName: ownerData.businessName,
-      email: ownerData.email || user?.email || '',
-      phone: ownerData.phone1,
-      phone2: ownerData.phone2 || '',
-      address: ownerData.address || '',
-      subscriptionStatus: 'active',
-      pricingPlan: 'basic',
-      allowedGyms: isOwnerRole ? (user.allowedGyms || 1) : (ownerData.allowedGyms || 1),
-      registeredMembersCount: 0,
-      totalPaidToCreator: 0,
-      lastPaymentDate: 'N/A',
-      subscriptionDueDate: '2026-07-05',
-      paymentsHistory: []
-    };
-    setGymOwners(prev => {
-      const updated = [newOwner, ...prev];
-      localStorage.setItem('gym_owners_registry_v3', JSON.stringify(updated));
-      return updated;
-    });
-    if (user && user.role === 'owner') {
-      setActiveOutletId(newId);
-    }
-  };
-
-  const submitBillingRequest = (ownerId, requestedPlan, requestedGyms, amount, paymentMethod) => {
-    const newReq = {
-      id: 'req_' + Date.now(),
-      ownerId: ownerId || user?.id || 'owner_golds',
-      ownerName: user?.name || 'Navneet Nihal Lakra',
-      ownerEmail: user?.email || 'demo@gymowner.com',
-      businessName: user?.businessName || "Gold's Gym Elite",
-      requestedPlan: 'basic',
-      requestedGyms: requestedGyms || 1,
-      amount: 699,
-      paymentMethod: paymentMethod || 'UPI',
-      paymentDate: formatDate(new Date()),
-      status: 'approved'
-    };
-    
-    setBillingRequests(prev => {
-      const updated = [newReq, ...prev];
-      localStorage.setItem('billing_requests_v1', JSON.stringify(updated));
-      return updated;
-    });
-
-    // Directly apply renewal approval
-    setGymOwners(currentOwners => {
-      const updatedOwners = currentOwners.map(owner => {
-        if (
-          owner.id === newReq.ownerId || 
-          owner.name === newReq.ownerName || 
-          (owner.email === newReq.ownerEmail && owner.email !== '')
-        ) {
-          const notes = `Access Granted: Basic Plan - ₹699`;
-          const newPayment = {
-            id: 'pay_' + Date.now(),
-            amountPaid: 699,
-            paymentDate: formatDate(new Date()),
-            paymentMethod: newReq.paymentMethod || 'UPI',
-            notes: notes
-          };
-          
-          // Calculate next subscription due date
-          const todayStr = formatDate(new Date());
-          const currentDueDate = owner.subscriptionDueDate || todayStr;
-          const isOverdue = owner.subscriptionStatus === 'overdue' || owner.subscriptionStatus === 'revoked' || new Date(currentDueDate) < new Date(todayStr);
-          const baseDate = isOverdue ? todayStr : currentDueDate;
-          const newDueDate = addDays(baseDate, 30);
-
-          return {
-            ...owner,
-            pricingPlan: 'basic',
-            allowedGyms: newReq.requestedGyms || 1,
-            subscriptionStatus: 'active',
-            subscriptionDueDate: newDueDate,
-            paymentsHistory: [newPayment, ...(owner.paymentsHistory || [])],
-            totalPaidToCreator: (owner.totalPaidToCreator || 0) + 699,
-            lastPaymentDate: formatDate(new Date())
-          };
-        }
-        return owner;
-      });
-      localStorage.setItem('gym_owners_registry_v3', JSON.stringify(updatedOwners));
-      return updatedOwners;
-    });
-
-    setUser(currentUser => {
-      if (
-        currentUser && 
-        (currentUser.id === newReq.ownerId || 
-         currentUser.name === newReq.ownerName || 
-         (currentUser.email === newReq.ownerEmail && currentUser.email !== ''))
-      ) {
-        const newBillingPayment = {
-          id: 'bp_' + Date.now(),
-          amountPaid: 699,
-          paymentDate: formatDate(new Date()),
-          paymentMethod: newReq.paymentMethod || 'UPI',
-          notes: `Package Activated: Basic Plan - ₹699`
-        };
-
-        const todayStr = formatDate(new Date());
-        const currentDueDate = currentUser.subscriptionDueDate || todayStr;
-        const isOverdue = currentUser.subscriptionStatus === 'overdue' || currentUser.subscriptionStatus === 'revoked' || new Date(currentDueDate) < new Date(todayStr);
-        const baseDate = isOverdue ? todayStr : currentDueDate;
-        const newDueDate = addDays(baseDate, 30);
-
-        const updated = {
-          ...currentUser,
-          subscriptionStatus: 'active',
-          subscriptionDueDate: newDueDate,
-          graceDaysRemaining: 10,
-          pricingPlan: 'basic',
-          allowedGyms: newReq.requestedGyms || 1,
-          billingPayments: [newBillingPayment, ...(currentUser.billingPayments || [])]
-        };
-        localStorage.setItem('owner_user', JSON.stringify(updated));
-        return updated;
+      if (response.ok) {
+        const data = await response.json(); // returns { client }
+        setGymOwners(prev => prev.map(o => o.id === ownerId ? data.client : o));
+        return true;
       }
-      return currentUser;
-    });
+    } catch (err) {
+      console.error('Update client status API error:', err);
+    }
+    return false;
   };
 
-  const approveBillingRequest = (requestId) => {
-    let request = billingRequests.find(r => r.id === requestId);
+  const markGymOwnerPaid = async (ownerId) => {
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return false;
     
-    setBillingRequests(prev => {
-      const updatedRequests = prev.map(req => {
-        if (req.id === requestId) {
-          request = req; // capture in case state was deferred
-          return { ...req, status: 'approved' };
-        }
-        return req;
-      });
-      localStorage.setItem('billing_requests_v1', JSON.stringify(updatedRequests));
-      return updatedRequests;
-    });
+    // Find the owner to calculate next subscription due date
+    const owner = gymOwners.find(o => o.id === ownerId);
+    if (!owner) return false;
 
-    if (request) {
-      setGymOwners(currentOwners => {
-        const updatedOwners = currentOwners.map(owner => {
-          if (
-            owner.id === request.ownerId || 
-            owner.name === request.ownerName || 
-            (owner.email === request.ownerEmail && owner.email !== '')
-          ) {
-            const notes = `Access Granted: Basic Plan - ₹699`;
-            const newPayment = {
-              id: 'pay_' + Date.now(),
-              amountPaid: 699,
-              paymentDate: formatDate(new Date()),
-              paymentMethod: request.paymentMethod || 'UPI',
-              notes: notes
-            };
-            return {
-              ...owner,
-              pricingPlan: 'basic',
-              allowedGyms: request.requestedGyms || 1,
-              subscriptionStatus: 'active',
-              subscriptionDueDate: addDays(formatDate(new Date()), 30),
-              paymentsHistory: [newPayment, ...(owner.paymentsHistory || [])],
-              totalPaidToCreator: (owner.totalPaidToCreator || 0) + 699,
-              lastPaymentDate: formatDate(new Date())
-            };
-          }
-          return owner;
+    const todayStr = formatDate(new Date());
+    const currentDueDate = owner.subscriptionDueDate || todayStr;
+    const isOverdue = owner.subscriptionStatus === 'overdue' || owner.subscriptionStatus === 'revoked' || new Date(currentDueDate) < new Date(todayStr);
+    const baseDate = isOverdue ? todayStr : currentDueDate;
+    const newDueDate = addDays(baseDate, 30);
+
+    try {
+      const response = await fetch(`http://localhost:5001/api/creator/clients/${ownerId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: 'active',
+          subscriptionDueDate: newDueDate,
+          recordPayment: true
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json(); // returns { client }
+        setGymOwners(prev => prev.map(o => o.id === ownerId ? data.client : o));
+        
+        // Refresh billing requests list (creator ledger)
+        const ledgerResp = await fetch('http://localhost:5001/api/creator/ledger', {
+          headers: { 'Authorization': `Bearer ${token}` }
         });
-        localStorage.setItem('gym_owners_registry_v3', JSON.stringify(updatedOwners));
-        return updatedOwners;
+        if (ledgerResp.ok) {
+          const ledgerData = await ledgerResp.json();
+          setBillingRequests(ledgerData.logs);
+        }
+        return true;
+      }
+    } catch (err) {
+      console.error('Mark gym owner paid API error:', err);
+    }
+    return false;
+  };
+
+  const reverseGymOwnerPayment = async (ownerId) => {
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return false;
+    try {
+      const response = await fetch(`http://localhost:5001/api/creator/clients/${ownerId}/reverse`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
 
-      setUser(currentUser => {
-        if (
-          currentUser && 
-          (currentUser.id === request.ownerId || 
-           currentUser.name === request.ownerName || 
-           (currentUser.email === request.ownerEmail && currentUser.email !== ''))
-        ) {
-          const newBillingPayment = {
-            id: 'bp_' + Date.now(),
-            amountPaid: 699,
-            paymentDate: formatDate(new Date()),
-            paymentMethod: request.paymentMethod || 'UPI',
-            notes: `Package Activated: Basic Plan - ₹699`
-          };
+      if (response.ok) {
+        const data = await response.json(); // returns { client }
+        setGymOwners(prev => prev.map(o => o.id === ownerId ? data.client : o));
+        
+        // Refresh billing requests list
+        const ledgerResp = await fetch('http://localhost:5001/api/creator/ledger', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (ledgerResp.ok) {
+          const ledgerData = await ledgerResp.json();
+          setBillingRequests(ledgerData.logs);
+        }
+        return true;
+      }
+    } catch (err) {
+      console.error('Reverse gym owner payment API error:', err);
+    }
+    return false;
+  };
+
+  const deleteGymOwner = async (ownerId) => {
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return false;
+    try {
+      const response = await fetch(`http://localhost:5001/api/creator/clients/${ownerId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        setGymOwners(prev => prev.filter(o => o.id !== ownerId));
+        return true;
+      }
+    } catch (err) {
+      console.error('Delete client API error:', err);
+    }
+    return false;
+  };
+
+  const addGymOwner = async (ownerData) => {
+    const token = localStorage.getItem('jwt_token');
+    try {
+      const response = await fetch('http://localhost:5001/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: ownerData.ownerName || 'Gym Owner',
+          email: ownerData.email || `gym_${Date.now()}@test.com`,
+          password: 'password123',
+          businessName: ownerData.businessName,
+          phone: ownerData.phone1
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json(); // returns { token, user }
+        const newOwnerEnriched = {
+          ...data.user,
+          registeredMembersCount: 0
+        };
+        setGymOwners(prev => [newOwnerEnriched, ...prev]);
+
+        // If called by an Owner themselves to create a new gym outlet (allowedGyms logic)
+        if (user && user.role === 'owner') {
+          setActiveOutletId(data.user.id);
+        }
+        return true;
+      }
+    } catch (err) {
+      console.error('Add gym owner API error:', err);
+    }
+    return false;
+  };
+
+  const submitBillingRequest = async (ownerId, requestedPlan, requestedGyms, amount, paymentMethod) => {
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return false;
+    try {
+      const response = await fetch('http://localhost:5001/api/creator/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          upiTxnId: 'Direct Pay',
+          notes: `Plan: ${requestedPlan}, Gyms: ${requestedGyms}`
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json(); // returns { user, billingRequest }
+        
+        // Update context user with fresh subscription coordinates
+        setUser(prev => {
+          if (!prev) return null;
           const updated = {
-            ...currentUser,
-            subscriptionStatus: 'active',
-            subscriptionDueDate: addDays(formatDate(new Date()), 30),
-            graceDaysRemaining: 10,
-            pricingPlan: 'basic',
-            allowedGyms: request.requestedGyms || 1,
-            billingPayments: [newBillingPayment, ...(currentUser.billingPayments || [])]
+            ...prev,
+            subscriptionStatus: data.user.subscriptionStatus,
+            subscriptionDueDate: data.user.subscriptionDueDate,
+            totalPaidToCreator: data.user.totalPaidToCreator,
+            billingPayments: data.user.billingPayments
           };
           localStorage.setItem('owner_user', JSON.stringify(updated));
           return updated;
-        }
-        return currentUser;
-      });
+        });
+
+        // Add request to local billingRequests
+        setBillingRequests(prev => [data.billingRequest, ...prev]);
+        return true;
+      }
+    } catch (err) {
+      console.error('Submit billing request API error:', err);
     }
+    return false;
   };
 
-  const rejectBillingRequest = (requestId) => {
-    setBillingRequests(prev => {
-      const updated = prev.map(req => {
-        if (req.id === requestId) {
-          return { ...req, status: 'rejected' };
-        }
-        return req;
-      });
-      localStorage.setItem('billing_requests_v1', JSON.stringify(updated));
-      return updated;
-    });
+  const approveBillingRequest = async (requestId) => {
+    // The self-serve checkout automatically approves, so this is handled by database update status or recordPayment.
+    // If called manually on creator dashboard:
+    const reqItem = billingRequests.find(r => r.id === requestId || r._id === requestId);
+    if (!reqItem) return false;
+    
+    // Approve it by setting owner status active and adding payment
+    return await markGymOwnerPaid(reqItem.ownerId);
+  };
+
+  const rejectBillingRequest = async (requestId) => {
+    // Standard mock rejection simply updates local status. We can keep it client-side or ignore since checkout auto-approves.
+    setBillingRequests(prev => prev.map(req => {
+      if (req.id === requestId || req._id === requestId) {
+        return { ...req, status: 'rejected' };
+      }
+      return req;
+    }));
   };
 
   return {

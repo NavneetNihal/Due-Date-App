@@ -68,7 +68,7 @@ export const getPlatformClients = async (req, res) => {
 // @route   PUT /api/creator/clients/:id/status
 // @access  Private (Creator Only)
 export const updateClientSubscriptionStatus = async (req, res) => {
-  const { status, subscriptionDueDate, allowedGyms } = req.body;
+  const { status, subscriptionDueDate, allowedGyms, recordPayment } = req.body;
 
   try {
     const client = await User.findById(req.params.id);
@@ -80,6 +80,29 @@ export const updateClientSubscriptionStatus = async (req, res) => {
     if (subscriptionDueDate) client.subscriptionDueDate = subscriptionDueDate;
     if (allowedGyms !== undefined) client.allowedGyms = allowedGyms;
 
+    if (recordPayment) {
+      const todayStr = formatDate(new Date());
+      client.totalPaidToCreator = (client.totalPaidToCreator || 0) + 699;
+      client.billingPayments.push({
+        amount: 699,
+        paymentDate: todayStr,
+        paymentMethod: 'UPI',
+        notes: 'Manual payment approval by creator'
+      });
+
+      // Log the BillingRequest
+      await BillingRequest.create({
+        ownerId: client._id,
+        ownerName: client.name,
+        businessName: client.businessName,
+        amount: 699,
+        status: 'approved',
+        requestDate: todayStr,
+        upiTxnId: 'MANUAL_CREATOR_APPROVE',
+        notes: 'Manual payment approval by creator'
+      });
+    }
+
     await client.save();
 
     res.json({
@@ -90,7 +113,9 @@ export const updateClientSubscriptionStatus = async (req, res) => {
         businessName: client.businessName,
         subscriptionStatus: client.subscriptionStatus,
         subscriptionDueDate: client.subscriptionDueDate,
-        allowedGyms: client.allowedGyms
+        allowedGyms: client.allowedGyms,
+        totalPaidToCreator: client.totalPaidToCreator,
+        billingPayments: client.billingPayments
       }
     });
   } catch (error) {
@@ -243,5 +268,67 @@ export const submitSaaSRenewal = async (req, res) => {
   } catch (error) {
     console.error('Renewal submission error:', error);
     res.status(500).json({ message: 'Server error submitting renewal payment' });
+  }
+};
+
+// @desc    Reverse SaaS subscription payment for a gym owner
+// @route   POST /api/creator/clients/:id/reverse
+// @access  Private (Creator Only)
+export const reverseClientPayment = async (req, res) => {
+  try {
+    const client = await User.findById(req.params.id);
+    if (!client) {
+      return res.status(404).json({ message: 'Client not found' });
+    }
+
+    if (!client.billingPayments || client.billingPayments.length === 0) {
+      return res.status(400).json({ message: 'No payments found to reverse' });
+    }
+
+    // Find the last positive payment and remove it
+    const lastPayment = client.billingPayments[client.billingPayments.length - 1];
+    client.billingPayments.pop();
+    client.totalPaidToCreator = Math.max(0, (client.totalPaidToCreator || 0) - lastPayment.amount);
+
+    // Rollback due date by 30 days
+    const todayStr = formatDate(new Date());
+    const oldDueDate = client.subscriptionDueDate || todayStr;
+    const newDueDate = addDays(oldDueDate, -30);
+    client.subscriptionDueDate = newDueDate;
+
+    // Recalculate status based on rolled back due date
+    const todayDate = new Date(todayStr);
+    const parsedNewDueDate = new Date(newDueDate);
+    if (todayDate > parsedNewDueDate) {
+      const diffDays = Math.ceil(Math.abs(todayDate - parsedNewDueDate) / (1000 * 60 * 60 * 24));
+      client.subscriptionStatus = diffDays > 10 ? 'revoked' : 'overdue';
+    } else {
+      client.subscriptionStatus = 'active';
+    }
+
+    // Also remove from BillingRequests matching this client and amount
+    const billingReq = await BillingRequest.findOne({ ownerId: client._id }).sort({ createdAt: -1 });
+    if (billingReq) {
+      await BillingRequest.deleteOne({ _id: billingReq._id });
+    }
+
+    await client.save();
+
+    res.json({
+      message: 'SaaS payment reversed successfully',
+      client: {
+        id: client._id,
+        name: client.name,
+        businessName: client.businessName,
+        subscriptionStatus: client.subscriptionStatus,
+        subscriptionDueDate: client.subscriptionDueDate,
+        allowedGyms: client.allowedGyms,
+        totalPaidToCreator: client.totalPaidToCreator,
+        billingPayments: client.billingPayments
+      }
+    });
+  } catch (error) {
+    console.error('Reverse client payment error:', error);
+    res.status(500).json({ message: 'Server error reversing client payment' });
   }
 };

@@ -1,65 +1,112 @@
-import { formatDate, addDays } from './dateHelpers.js';
-
 export const useMemberActions = (members, setMembers, activeOutletId, setPayments, setUser, addPaymentRecord) => {
-  const simulate200Members = () => {
-    setMembers(prev => {
-      const activeGymId = activeOutletId || 'owner_golds';
-      const otherMembers = prev.filter(m => (m.gymId || 'owner_golds') !== activeGymId);
-      const currentGymMembers = prev.filter(m => (m.gymId || 'owner_golds') === activeGymId);
-      const mockList = [...currentGymMembers];
-      const countToGenerate = 200 - mockList.length;
-      if (countToGenerate > 0) {
-        for (let i = 0; i < countToGenerate; i++) {
-          mockList.push({
-            id: 'm_mock_' + activeGymId + '_' + Date.now() + '_' + i,
+  const simulate200Members = async () => {
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return;
+    
+    // To make it fast and not overload database/network, we simulate by adding 10 test members in MongoDB
+    console.log('Simulating test members in database...');
+    const activeGymId = activeOutletId || 'owner_golds';
+    
+    for (let i = 0; i < 10; i++) {
+      try {
+        const response = await fetch('http://localhost:5001/api/members', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
             name: `Test Member ${i + 1}`,
             phoneNumber: '9876500000',
-            joiningDate: formatDate(new Date()),
             subscriptionTier: 'monthly',
-            subscriptionAmount: 1000,
-            nextDueDate: addDays(formatDate(new Date()), 30),
-            status: 'active',
+            amount: 1000,
             gymId: activeGymId
-          });
+          })
+        });
+        if (response.ok) {
+          const newMember = await response.json();
+          setMembers(prev => [newMember, ...prev]);
         }
+      } catch (err) {
+        console.error('Simulation member error:', err);
       }
-      const updated = [...otherMembers, ...mockList];
-      localStorage.setItem('gym_members_v5', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const addMember = (memberData) => {
-    const newMember = {
-      id: 'm_' + Date.now(),
-      name: memberData.name,
-      phoneNumber: memberData.phoneNumber,
-      joiningDate: memberData.joiningDate,
-      subscriptionTier: memberData.subscriptionTier,
-      subscriptionAmount: parseInt(memberData.subscriptionAmount, 10),
-      nextDueDate: memberData.nextDueDate,
-      status: memberData.status || 'active',
-      gymId: memberData.gymId || activeOutletId || 'owner_golds'
-    };
-
-    setMembers(prev => [newMember, ...prev]);
-
-    // Also add initial payment record if marked as paid during creation
-    if (memberData.isPaid) {
-      addPaymentRecord(newMember.id, newMember.name, newMember.subscriptionAmount, 'UPI', 'Initial Join Payment');
-      
-      setUser(prev => {
-        if (!prev) return prev;
-        const updated = { ...prev, allTimeEarnings: (prev.allTimeEarnings || 0) + newMember.subscriptionAmount };
-        localStorage.setItem('owner_user', JSON.stringify(updated));
-        return updated;
-      });
     }
   };
 
-  const deleteMember = (id) => {
-    setMembers(prev => prev.filter(m => m.id !== id));
-    setPayments(prev => prev.filter(p => p.memberId !== id));
+  const addMember = async (memberData) => {
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return false;
+    try {
+      const response = await fetch('http://localhost:5001/api/members', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: memberData.name,
+          phoneNumber: memberData.phoneNumber,
+          subscriptionTier: memberData.subscriptionTier,
+          amount: parseInt(memberData.subscriptionAmount, 10),
+          joiningDate: memberData.joiningDate,
+          nextDueDate: memberData.nextDueDate,
+          gymId: memberData.gymId || activeOutletId || 'owner_golds'
+        })
+      });
+
+      if (response.ok) {
+        const newMember = await response.json();
+        setMembers(prev => [newMember, ...prev]);
+
+        // Also add initial payment record if marked as paid during creation
+        if (memberData.isPaid) {
+          const payResponse = await fetch('http://localhost:5001/api/payments/pay', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              memberId: newMember._id,
+              paymentMethod: 'UPI',
+              notes: 'Initial Join Payment'
+            })
+          });
+
+          if (payResponse.ok) {
+            const payData = await payResponse.json();
+            // Update local member state with extended due date
+            setMembers(prev => prev.map(m => m._id === newMember._id ? payData.member : m));
+            setPayments(prev => [payData.payment, ...prev]);
+          }
+        }
+        return true;
+      }
+    } catch (error) {
+      console.error('Add member API error:', error);
+    }
+    return false;
+  };
+
+  const deleteMember = async (id) => {
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return false;
+    try {
+      const response = await fetch(`http://localhost:5001/api/members/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        setMembers(prev => prev.filter(m => m._id !== id));
+        setPayments(prev => prev.filter(p => p.memberId !== id));
+        return true;
+      }
+    } catch (error) {
+      console.error('Delete member API error:', error);
+    }
+    return false;
   };
 
   return {
