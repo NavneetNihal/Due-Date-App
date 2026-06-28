@@ -22,7 +22,8 @@ import {
   Building,
   Check,
   RotateCcw,
-  Trash2
+  Trash2,
+  Lock
 } from 'lucide-react';
 
 function OwnerDashboard() {
@@ -438,11 +439,25 @@ function OwnerDashboard() {
             <p className="text-xs text-slate-400 mt-0.5">Manage members, log payments, and track automation triggers here.</p>
           </div>
           <button 
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-xs font-bold rounded-xl shadow-lg shadow-brand-primary/10 active:scale-95 transition cursor-pointer"
+            onClick={() => {
+              if (user?.subscriptionStatus === 'active' && user?.billingPayments && user.billingPayments.length > 0) {
+                setIsAddModalOpen(true);
+              } else {
+                setIsPayModalOpen(true);
+              }
+            }}
+            className={`flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-xl shadow-lg active:scale-95 transition cursor-pointer ${
+              (user?.subscriptionStatus === 'active' && user?.billingPayments && user.billingPayments.length > 0)
+                ? 'bg-brand-primary hover:bg-brand-primary-hover text-white shadow-brand-primary/10'
+                : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:bg-slate-750'
+            }`}
           >
-            <Plus className="h-4 w-4" />
-            Add Member
+            {(user?.subscriptionStatus === 'active' && user?.billingPayments && user.billingPayments.length > 0) ? (
+              <Plus className="h-4 w-4" />
+            ) : (
+              <Lock className="h-4 w-4 text-amber-500 animate-pulse" />
+            )}
+            {(user?.subscriptionStatus === 'active' && user?.billingPayments && user.billingPayments.length > 0) ? 'Add Member' : 'Unlock Add Member (Pay Due)'}
           </button>
         </div>
 

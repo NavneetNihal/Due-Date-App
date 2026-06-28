@@ -204,22 +204,21 @@ export const AppProvider = ({ children }) => {
   // Automatic subscription status check based on due dates
   useEffect(() => {
     if (user && user.subscriptionDueDate) {
+      // If manually revoked by creator, do not auto-override back to overdue/active
+      if (user.subscriptionStatus === 'revoked') {
+        return;
+      }
+
       const todayDate = new Date(formatDate(new Date()));
       const dueDate = new Date(user.subscriptionDueDate);
       
       if (todayDate > dueDate) {
         const diffTime = Math.abs(todayDate - dueDate);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const graceLeft = Math.max(0, 10 - diffDays);
         
-        if (diffDays > 10) {
-          if (user.subscriptionStatus !== 'revoked') {
-            authActions.updateOwnerSubscription('revoked', user.subscriptionDueDate, 0);
-          }
-        } else {
-          const graceLeft = 10 - diffDays;
-          if (user.subscriptionStatus !== 'overdue' || user.graceDaysRemaining !== graceLeft) {
-            authActions.updateOwnerSubscription('overdue', user.subscriptionDueDate, graceLeft);
-          }
+        if (user.subscriptionStatus !== 'overdue' || user.graceDaysRemaining !== graceLeft) {
+          authActions.updateOwnerSubscription('overdue', user.subscriptionDueDate, graceLeft);
         }
       } else {
         if (user.subscriptionStatus !== 'active') {
@@ -227,7 +226,7 @@ export const AppProvider = ({ children }) => {
         }
       }
     }
-  }, [members.length, user?.subscriptionDueDate]);
+  }, [members.length, user?.subscriptionDueDate, user?.subscriptionStatus]);
 
   // Synchronize current logged-in owner user state with registry updates from creator dashboard
   useEffect(() => {

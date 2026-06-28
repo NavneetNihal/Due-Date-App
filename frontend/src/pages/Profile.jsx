@@ -81,8 +81,11 @@ function Profile() {
 
 
 
+  // Filter payments to only those belonging to the active outlet
+  const outletPayments = payments.filter(p => (p.gymId || 'owner_golds') === (activeOutletId || 'owner_golds'));
+
   // Calculate total earnings from ledger
-  const totalCollected = payments.reduce((sum, p) => sum + p.amountPaid, 0);
+  const totalCollected = outletPayments.reduce((sum, p) => sum + p.amountPaid, 0);
   const membersCount = members.length;
 
   // Handle QR Code Image Upload (Base64)
@@ -444,16 +447,20 @@ Thank you!`;
                     <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Access Subscription Status</span>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border ${
-                        user?.subscriptionStatus === 'active' 
+                        (!user?.billingPayments || user.billingPayments.length === 0)
+                          ? 'bg-amber-500/10 text-amber-400 border-amber-500/25'
+                          : user?.subscriptionStatus === 'active' 
                           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25' 
                           : user?.subscriptionStatus === 'overdue' 
                           ? 'bg-amber-500/10 text-amber-400 border-amber-500/25' 
                           : 'bg-red-500/10 text-red-400 border-red-500/25'
                       }`}>
-                        {user?.subscriptionStatus || 'active'}
+                        {(!user?.billingPayments || user.billingPayments.length === 0) ? 'unpaid' : (user?.subscriptionStatus || 'active')}
                       </span>
                       <span className="text-xs text-slate-350">
-                        {user?.subscriptionStatus === 'active' 
+                        {(!user?.billingPayments || user.billingPayments.length === 0)
+                          ? 'Subscription payment pending. Pay to activate license.'
+                          : user?.subscriptionStatus === 'active' 
                           ? `Next renewal: ${user?.subscriptionDueDate || '2026-07-26'}` 
                           : user?.subscriptionStatus === 'overdue' 
                           ? `Grace expires in ${user?.graceDaysRemaining || 10} days (${user?.subscriptionDueDate || '2026-07-26'})` 
@@ -481,7 +488,7 @@ Thank you!`;
                           }}
                           className="py-2.5 px-4 bg-brand-primary hover:bg-brand-primary-hover text-white font-bold rounded-xl text-xs transition duration-150 cursor-pointer"
                         >
-                          {user?.subscriptionStatus === 'active' ? 'Renew Early' : 'Pay Renewal'} (₹699)
+                          {(!user?.billingPayments || user.billingPayments.length === 0) ? 'Pay Now' : (user?.subscriptionStatus === 'active' ? 'Renew Early' : 'Pay Renewal')} (₹699)
                         </button>
                       );
                     })()}
@@ -560,7 +567,7 @@ Thank you!`;
                 <div className="p-4 bg-slate-950/40 border border-dashed border-slate-800 rounded-xl space-y-3">
                   <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">🕒 SaaS Subscription Simulation Control (Developer/Test Panel)</span>
                   <p className="text-[10px] text-slate-500 leading-normal">
-                    Quickly test how the app reacts to different subscription stages (grace period warnings, lockout suspends) or simulate member limit caps.
+                    Quickly test how the app reacts to different subscription stages (grace period warnings, lockout suspends).
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -585,26 +592,6 @@ Thank you!`;
                       }`}
                     >
                       Overdue (6d Grace)
-                    </button>
-                    <button
-                      onClick={() => updateOwnerSubscription('revoked', formatDate(new Date()), 0)}
-                      className={`py-1.5 px-3 rounded-lg text-[10px] font-bold transition cursor-pointer ${
-                        user?.subscriptionStatus === 'revoked'
-                          ? 'bg-red-500 text-white font-black'
-                          : 'bg-slate-900 border border-slate-800 text-slate-450 hover:bg-slate-800'
-                      }`}
-                    >
-                      Revoked (Suspended)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        simulate200Members();
-                        alert("Filled registry with 200 mock members!");
-                      }}
-                      className="py-1.5 px-3 rounded-lg text-[10px] font-bold bg-purple-650/40 border border-purple-500/30 text-purple-300 hover:bg-purple-650/65 transition cursor-pointer"
-                    >
-                      Fill 200 Mock Members
                     </button>
                   </div>
                 </div>
