@@ -4,7 +4,8 @@ import {
   loginUser, 
   getUserProfile, 
   updateOwnerProfile, 
-  updateOwnerSettings 
+  updateOwnerSettings,
+  startFreeTrial
 } from '../controllers/authController.js';
 import { protect, authorizeRoles } from '../middleware/auth.js';
 
@@ -16,5 +17,6 @@ router.post('/login', loginUser);
 router.get('/profile', protect, getUserProfile);
 router.put('/profile', protect, authorizeRoles('owner'), updateOwnerProfile);
 router.put('/settings', protect, authorizeRoles('owner'), updateOwnerSettings);
+router.post('/start-trial', protect, authorizeRoles('owner'), startFreeTrial);
 
 export default router;

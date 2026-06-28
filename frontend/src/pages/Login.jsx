@@ -5,22 +5,22 @@ import { Dumbbell, Mail, Lock, LogIn, User } from 'lucide-react';
 
 function Login() {
   const [loginTab, setLoginTab] = useState('owner'); // owner, creator
-  const [username, setUsername] = useState('Nihal');
-  const [email, setEmail] = useState('demo@gymowner.com');
-  const [password, setPassword] = useState('password123');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
   const [creatorPassword, setCreatorPassword] = useState('creator123');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useContext(AppContext);
+  const { login, register } = useContext(AppContext);
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    // Mock delay for realistic premium feel
-    setTimeout(() => {
+    try {
       if (loginTab === 'creator') {
         if (creatorPassword !== 'creator123') {
           setError('Invalid administrator key / password');
@@ -28,28 +28,47 @@ function Login() {
           return;
         }
         
-        const success = login('Nihal', 'lakranihal0070@gmail.com', 'creator123');
+        const success = await login('lakranihal0070@gmail.com', 'creator123');
         if (success) {
           navigate('/dashboard');
         } else {
           setError('Creator authentication failed');
         }
       } else {
-        if (!username || !email || !password) {
-          setError('Please fill in all fields');
-          setLoading(false);
-          return;
-        }
-        
-        const success = login(username, email, password);
-        if (success) {
-          navigate('/dashboard');
+        if (isRegistering) {
+          if (!username || !email || !password) {
+            setError('Please fill in all fields');
+            setLoading(false);
+            return;
+          }
+          
+          const success = await register(username, email, password);
+          if (success) {
+            navigate('/dashboard');
+          } else {
+            setError('Email address already registered. Try logging in.');
+          }
         } else {
-          setError('Invalid credentials');
+          if (!email || !password) {
+            setError('Please fill in all fields');
+            setLoading(false);
+            return;
+          }
+          
+          const success = await login(email, password);
+          if (success) {
+            navigate('/dashboard');
+          } else {
+            setError('Invalid email or password');
+          }
         }
       }
+    } catch (err) {
+      console.error(err);
+      setError('An error occurred. Please try again.');
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   const handleSSOLogin = (provider) => {
@@ -96,6 +115,7 @@ function Login() {
               type="button"
               onClick={() => {
                 setLoginTab('owner');
+                setIsRegistering(false);
                 setError('');
               }}
               className={`py-2 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
@@ -110,6 +130,7 @@ function Login() {
               type="button"
               onClick={() => {
                 setLoginTab('creator');
+                setIsRegistering(false);
                 setError('');
               }}
               className={`py-2 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
@@ -176,25 +197,27 @@ function Login() {
               </>
             ) : (
               <>
-                {/* Username Field */}
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-350 uppercase tracking-wider block">
-                    Your Username (shown on dashboard)
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                      <User className="h-4.5 w-4.5" />
+                {/* Username Field - Only shown when registering */}
+                {isRegistering && (
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-350 uppercase tracking-wider block">
+                      Your Username (shown on dashboard)
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                        <User className="h-4.5 w-4.5" />
+                      </div>
+                      <input
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all duration-200 placeholder-slate-650 text-sm"
+                        placeholder="Nihal"
+                        required
+                      />
                     </div>
-                    <input
-                      type="text"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all duration-200 placeholder-slate-650 text-sm"
-                      placeholder="Nihal"
-                      required
-                    />
                   </div>
-                </div>
+                )}
 
                 {/* Email Field */}
                 <div className="space-y-1">
@@ -249,11 +272,32 @@ function Login() {
               ) : (
                 <>
                   <LogIn className="h-4.5 w-4.5" />
-                  {loginTab === 'creator' ? 'Sign In as Creator' : 'Sign In to Dashboard'}
+                  {loginTab === 'creator' 
+                    ? 'Sign In as Creator' 
+                    : isRegistering 
+                    ? 'Create Account' 
+                    : 'Sign In to Dashboard'}
                 </>
               )}
             </button>
           </form>
+
+          {loginTab !== 'creator' && (
+            <div className="mt-4 space-y-4">
+              {/* Toggle Login vs Register */}
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setIsRegistering(!isRegistering)}
+                  className="text-xs text-brand-primary hover:text-brand-primary-hover font-bold hover:underline cursor-pointer"
+                >
+                  {isRegistering 
+                    ? "Already have an account? Sign In" 
+                    : "New to Due Date? Create an Account"}
+                </button>
+              </div>
+            </div>
+          )}
 
           {loginTab !== 'creator' && (
             <>

@@ -51,6 +51,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  isTrial: {
+    type: Boolean,
+    default: false
+  },
+  trialUsed: {
+    type: Boolean,
+    default: false
+  },
   graceDaysRemaining: {
     type: Number,
     default: 10
@@ -80,7 +88,7 @@ userSchema.methods.comparePassword = async function (enteredPassword) {
 // Auto hash passwords before saving
 userSchema.pre('save', async function (next) {
   if (!this.isModified('passwordHash')) {
-    next();
+    return next();
   }
   const salt = await bcrypt.genSalt(10);
   this.passwordHash = await bcrypt.hash(this.passwordHash, salt);

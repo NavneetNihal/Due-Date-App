@@ -21,8 +21,8 @@ export const registerOwner = async (req, res) => {
       return res.status(400).json({ message: 'Email address already registered' });
     }
 
-    // Default subscription setup: Must pay to activate license (due immediately)
-    const subscriptionDueDate = formatDate(new Date());
+    // Default subscription setup: 35 days access on registration
+    const subscriptionDueDate = addDays(formatDate(new Date()), 35);
 
     const user = await User.create({
       name,
@@ -34,7 +34,7 @@ export const registerOwner = async (req, res) => {
       subscriptionStatus: 'active',
       pricingPlan: 'basic',
       subscriptionDueDate,
-      graceDaysRemaining: 0
+      graceDaysRemaining: 10
     });
 
     res.status(201).json({
@@ -50,6 +50,8 @@ export const registerOwner = async (req, res) => {
         pricingPlan: user.pricingPlan,
         subscriptionDueDate: user.subscriptionDueDate,
         graceDaysRemaining: user.graceDaysRemaining,
+        isTrial: user.isTrial,
+        trialUsed: user.trialUsed,
         settings: user.settings,
         billingPayments: user.billingPayments
       }
@@ -90,6 +92,8 @@ export const loginUser = async (req, res) => {
         pricingPlan: user.pricingPlan,
         subscriptionDueDate: user.subscriptionDueDate,
         graceDaysRemaining: user.graceDaysRemaining,
+        isTrial: user.isTrial,
+        trialUsed: user.trialUsed,
         settings: user.settings,
         billingPayments: user.billingPayments
       }
@@ -118,19 +122,31 @@ export const getUserProfile = async (req, res) => {
       const dueDate = new Date(user.subscriptionDueDate);
 
       if (todayDate > dueDate) {
-        // Overdue status check
-        if (user.subscriptionStatus === 'active') {
-          user.subscriptionStatus = 'overdue';
+        if (user.isTrial) {
+          user.isTrial = false;
+          user.subscriptionStatus = 'revoked'; // Lock screen on trial expiration
+          user.graceDaysRemaining = 0;
           modified = true;
-        }
+        } else {
+          // Overdue status check
+          if (user.subscriptionStatus === 'active') {
+            user.subscriptionStatus = 'overdue';
+            modified = true;
+          }
 
-        const diffTime = Math.abs(todayDate - dueDate);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        const graceLeft = Math.max(0, 10 - diffDays);
+          const diffTime = Math.abs(todayDate - dueDate);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          const graceLeft = Math.max(0, 10 - diffDays);
 
-        if (user.graceDaysRemaining !== graceLeft) {
-          user.graceDaysRemaining = graceLeft;
-          modified = true;
+          if (user.graceDaysRemaining !== graceLeft) {
+            user.graceDaysRemaining = graceLeft;
+            modified = true;
+          }
+
+          if (graceLeft === 0 && user.subscriptionStatus !== 'revoked') {
+            user.subscriptionStatus = 'revoked';
+            modified = true;
+          }
         }
       } else {
         // Status remains active if not manually revoked
@@ -157,6 +173,8 @@ export const getUserProfile = async (req, res) => {
       pricingPlan: user.pricingPlan,
       subscriptionDueDate: user.subscriptionDueDate,
       graceDaysRemaining: user.graceDaysRemaining,
+      isTrial: user.isTrial,
+      trialUsed: user.trialUsed,
       settings: user.settings,
       billingPayments: user.billingPayments
     });
@@ -226,6 +244,8 @@ export const updateOwnerProfile = async (req, res) => {
         pricingPlan: user.pricingPlan,
         subscriptionDueDate: user.subscriptionDueDate,
         graceDaysRemaining: user.graceDaysRemaining,
+        isTrial: user.isTrial,
+        trialUsed: user.trialUsed,
         settings: user.settings,
         billingPayments: user.billingPayments
       }
@@ -233,5 +253,55 @@ export const updateOwnerProfile = async (req, res) => {
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({ message: 'Server error updating profile' });
+  }
+};
+
+// @desc    Start Free Trial (7 Days) for a registered Owner
+// @route   POST /api/auth/start-trial
+// @access  Private (Owner Only)
+export const startFreeTrial = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.trialUsed) {
+      return res.status(400).json({ message: 'You have already used your free trial.' });
+    }
+
+    const todayStr = formatDate(new Date());
+    const trialDueDate = addDays(todayStr, 7); // 7-day trial
+
+    user.isTrial = true;
+    user.trialUsed = true;
+    user.subscriptionStatus = 'active';
+    user.subscriptionDueDate = trialDueDate;
+    user.graceDaysRemaining = 0; // immediate suspension once trial expires
+
+    await user.save();
+
+    res.json({
+      message: '7-Day Free Trial started successfully!',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        businessName: user.businessName,
+        phone: user.phone,
+        subscriptionStatus: user.subscriptionStatus,
+        pricingPlan: user.pricingPlan,
+        subscriptionDueDate: user.subscriptionDueDate,
+        graceDaysRemaining: user.graceDaysRemaining,
+        isTrial: user.isTrial,
+        trialUsed: user.trialUsed,
+        settings: user.settings,
+        billingPayments: user.billingPayments
+      }
+    });
+  } catch (error) {
+    console.error('Start trial error:', error);
+    res.status(500).json({ message: 'Server error starting free trial' });
   }
 };

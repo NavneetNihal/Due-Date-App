@@ -30,11 +30,10 @@ export const addMember = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
 
-    // Lockout check: Block member creation if the owner hasn't paid or status is not active
-    const hasPaid = user.billingPayments && user.billingPayments.length > 0;
-    if (user.subscriptionStatus !== 'active' || !hasPaid) {
+    // Lockout check: Block member creation only if the owner's status is revoked (suspended)
+    if (user.subscriptionStatus === 'revoked') {
       return res.status(403).json({ 
-        message: 'Member creation is locked. Please pay the platform license fee to unlock.' 
+        message: 'Member creation is locked. Your account access has been suspended.' 
       });
     }
 

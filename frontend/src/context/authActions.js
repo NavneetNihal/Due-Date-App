@@ -1,16 +1,12 @@
 import { formatDate, addDays } from './dateHelpers.js';
 
 export const useAuthActions = (user, setUser, gymOwners, setGymOwners) => {
-  const login = async (username, email, password) => {
-    // Check if logging in as App Creator
-    const isCreator = (username && username.toLowerCase() === 'nihal') || 
-                      (email && email.toLowerCase() === 'lakranihal0070@gmail.com');
-
+  const login = async (email, password) => {
     try {
       const response = await fetch('http://localhost:5001/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email || 'demo@gymowner.com', password })
+        body: JSON.stringify({ email, password })
       });
 
       if (response.ok) {
@@ -20,33 +16,37 @@ export const useAuthActions = (user, setUser, gymOwners, setGymOwners) => {
         localStorage.setItem('jwt_token', data.token);
         return true;
       }
+      return false;
+    } catch (error) {
+      console.error('Login API error:', error);
+      return false;
+    }
+  };
 
-      // If user doesn't exist and they are trying to log in as a gym owner, auto-register them
-      if (!isCreator && (response.status === 401 || response.status === 404)) {
-        console.log('User not found. Auto-registering Gym Owner...');
-        const regResponse = await fetch('http://localhost:5001/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: username || "New Gym Owner",
-            email: email || 'demo@gymowner.com',
-            password,
-            businessName: username ? `${username}'s Gym` : "Gold's Gym Elite",
-            phone: '9999988888'
-          })
-        });
+  const register = async (username, email, password) => {
+    try {
+      const response = await fetch('http://localhost:5001/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: username || "New Gym Owner",
+          email,
+          password,
+          businessName: username ? `${username}'s Gym` : "My Gym",
+          phone: '9999988888'
+        })
+      });
 
-        if (regResponse.ok) {
-          const regData = await regResponse.json();
-          setUser(regData.user);
-          localStorage.setItem('owner_user', JSON.stringify(regData.user));
-          localStorage.setItem('jwt_token', regData.token);
-          return true;
-        }
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data.user);
+        localStorage.setItem('owner_user', JSON.stringify(data.user));
+        localStorage.setItem('jwt_token', data.token);
+        return true;
       }
       return false;
     } catch (error) {
-      console.error('Login/register API error:', error);
+      console.error('Register API error:', error);
       return false;
     }
   };
@@ -166,6 +166,7 @@ export const useAuthActions = (user, setUser, gymOwners, setGymOwners) => {
 
   return {
     login,
+    register,
     logout,
     updateSettings,
     updateProfile,

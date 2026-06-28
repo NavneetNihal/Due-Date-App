@@ -42,7 +42,8 @@ function OwnerDashboard() {
     setActiveOutletId,
     deleteGymOwner,
     addGymOwner,
-    updateOwnerSubscription
+    updateOwnerSubscription,
+    startFreeTrial
   } = useContext(AppContext);
   const navigate = useNavigate();
 
@@ -185,109 +186,29 @@ function OwnerDashboard() {
     }, 1500);
   };
 
-  // Revoked Access or Unpaid Account Locked Screen render
-  const hasPaid = user?.billingPayments && user.billingPayments.length > 0;
-  if (user && (user.subscriptionStatus === 'revoked' || !hasPaid)) {
+  // Revoked Access Locked Screen (Clean Black Takeover)
+  if (user && user.subscriptionStatus === 'revoked') {
     return (
-      <div className="min-h-screen relative flex items-center justify-center p-4 bg-slate-955">
-        {/* Background glows */}
-        <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-red-500/10 rounded-full blur-[80px]"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-brand-accent/5 rounded-full blur-[100px]"></div>
-        
-        <div className="backdrop-blur-md bg-slate-900/60 border border-slate-800 max-w-md w-full rounded-2xl shadow-2xl p-6 text-center z-10 relative">
-          <div className="mx-auto w-14 h-14 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center text-red-500 mb-4 animate-pulse">
-            <AlertCircle className="h-7 w-7" />
+      <div className="min-h-screen flex items-center justify-center p-6 bg-[#000000] text-slate-100 selection:bg-brand-primary selection:text-white z-[9999] relative">
+        <div className="max-w-md w-full text-center space-y-6">
+          <div className="mx-auto w-16 h-16 bg-red-950/30 border border-red-900/50 rounded-full flex items-center justify-center text-red-500 mb-6 animate-pulse">
+            <Lock className="h-8 w-8" />
           </div>
           
-          <h2 className="text-xl font-extrabold text-slate-100">
-            {!hasPaid ? 'License Activation Required' : 'Access Suspended'}
-          </h2>
-          <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-            {!hasPaid 
-              ? 'Welcome to Due Date! To start managing your gym members, sending automated reminders, and using our digital ledger, please activate your monthly license.'
-              : 'Your subscription to Due Date has expired and is overdue by 10+ days. Please pay the subscription fee to restore full access to your member dashboard.'}
+          <h2 className="text-2xl font-black tracking-tight text-white uppercase font-sans">Access Suspended</h2>
+          <p className="text-xs text-slate-400 leading-relaxed font-sans px-4">
+            Your gym owner account access for <strong className="text-slate-200">{user.businessName}</strong> has been suspended due to pending subscription payment. Please contact the administrator to settle dues and reactivate your account.
           </p>
-          
-          <div className="p-4 bg-slate-950/60 border border-slate-850 rounded-xl my-5 text-left">
-            <div className="flex justify-between items-center text-xs font-semibold text-slate-400">
-              <span>Plan Rate:</span>
-              <span className="text-slate-200">₹699/month</span>
-            </div>
-            <div className="flex justify-between items-center text-xs font-semibold text-slate-400 mt-2">
-              <span>Current Plan:</span>
-              <span className="text-slate-200 font-bold">Basic Plan</span>
-            </div>
-            <div className="flex justify-between items-center text-xs font-semibold text-slate-400 mt-2">
-              <span>Gym Name:</span>
-              <span className="text-slate-200">{user.businessName}</span>
-            </div>
-          </div>
 
-          <button
-            onClick={() => {
-              setIsPayModalOpen(true);
-            }}
-            className="w-full py-3 px-4 bg-brand-primary hover:bg-brand-primary-hover text-white font-bold rounded-xl text-xs transition duration-150 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-brand-primary/20"
-          >
-            {!hasPaid ? 'Pay ₹699 & Activate License' : 'Pay Now & Restore Access'}
-          </button>
-          
-          <button
-            onClick={() => setShowLogoutConfirm(true)}
-            className="w-full mt-3 py-2 px-4 border border-slate-800 hover:bg-slate-800/50 text-slate-400 hover:text-slate-350 font-semibold rounded-xl text-xs transition cursor-pointer"
-          >
-            Log Out
-          </button>
+          <div className="pt-4 border-t border-slate-900">
+            <button
+              onClick={() => logout()}
+              className="w-full py-3 px-4 bg-slate-950 hover:bg-slate-900 border border-slate-900 text-slate-400 hover:text-slate-200 font-bold rounded-xl text-xs transition duration-150 cursor-pointer shadow-md"
+            >
+              Log Out of Account
+            </button>
+          </div>
         </div>
-        
-        {/* Direct Payment Checkout Modal */}
-        {isPayModalOpen && (
-          <OwnerPayModal 
-            isOpen={isPayModalOpen} 
-            onClose={() => setIsPayModalOpen(false)} 
-            amount={699}
-            requestedPlan="basic"
-            requestedGyms={user?.allowedGyms || 1}
-          />
-        )}
-
-        {/* ── Sign Out Confirmation Modal ── */}
-        {showLogoutConfirm && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm text-left">
-            <div className="bg-slate-900 border border-amber-500/20 rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 h-10 w-10 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center text-amber-400">
-                  <AlertCircle className="h-5 w-5 animate-pulse" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-100 font-sans">Sign Out?</h3>
-                  <p className="text-xs text-slate-400 mt-1 font-sans">
-                    Are you sure you want to sign out of your active Due Date dashboard session?
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 pt-1 font-sans">
-                <button
-                  type="button"
-                  onClick={() => setShowLogoutConfirm(false)}
-                  className="flex-1 py-2 border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowLogoutConfirm(false);
-                    logout();
-                  }}
-                  className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl transition cursor-pointer"
-                >
-                  Yes, Sign Out
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -445,24 +366,25 @@ function OwnerDashboard() {
           </div>
           <button 
             onClick={() => {
-              if (user?.subscriptionStatus === 'active' && user?.billingPayments && user.billingPayments.length > 0) {
+              const isLicenseUnlocked = user?.subscriptionStatus !== 'revoked';
+              if (isLicenseUnlocked) {
                 setIsAddModalOpen(true);
               } else {
                 setIsPayModalOpen(true);
               }
             }}
             className={`flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-xl shadow-lg active:scale-95 transition cursor-pointer ${
-              (user?.subscriptionStatus === 'active' && user?.billingPayments && user.billingPayments.length > 0)
+              (user?.subscriptionStatus !== 'revoked')
                 ? 'bg-brand-primary hover:bg-brand-primary-hover text-white shadow-brand-primary/10'
                 : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:bg-slate-750'
             }`}
           >
-            {(user?.subscriptionStatus === 'active' && user?.billingPayments && user.billingPayments.length > 0) ? (
+            {(user?.subscriptionStatus !== 'revoked') ? (
               <Plus className="h-4 w-4" />
             ) : (
               <Lock className="h-4 w-4 text-amber-500 animate-pulse" />
             )}
-            {(user?.subscriptionStatus === 'active' && user?.billingPayments && user.billingPayments.length > 0) ? 'Add Member' : 'Unlock Add Member (Pay Due)'}
+            {(user?.subscriptionStatus !== 'revoked') ? 'Add Member' : 'Unlock Add Member (Pay Due)'}
           </button>
         </div>
 
