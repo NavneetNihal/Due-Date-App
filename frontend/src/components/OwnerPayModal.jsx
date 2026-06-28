@@ -66,9 +66,6 @@ function OwnerPayModal({ isOpen, onClose, amount, requestedPlan, requestedGyms }
             <p className="text-xs text-slate-400 mt-2 leading-relaxed px-4">
               Your ₹{amount.toLocaleString('en-IN')} payment request has been logged.
             </p>
-            <p className="text-[10px] text-amber-500/90 font-semibold mt-1.5 uppercase tracking-wide">
-              Send the screenshot to Navneet Nihal Lakra to get access approved.
-            </p>
           </div>
         ) : simulating ? (
           /* SIMULATION LOADER */

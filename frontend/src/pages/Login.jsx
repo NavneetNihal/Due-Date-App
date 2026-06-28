@@ -28,7 +28,7 @@ function Login() {
           return;
         }
         
-        const success = login('Nihal', 'creator@app.com', 'creator123');
+        const success = login('Nihal', 'lakranihal0070@gmail.com', 'creator123');
         if (success) {
           navigate('/dashboard');
         } else {

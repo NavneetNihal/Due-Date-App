@@ -185,22 +185,27 @@ function OwnerDashboard() {
     }, 1500);
   };
 
-  // Revoked Access Locked Screen render
-  if (user && user.subscriptionStatus === 'revoked') {
+  // Revoked Access or Unpaid Account Locked Screen render
+  const hasPaid = user?.billingPayments && user.billingPayments.length > 0;
+  if (user && (user.subscriptionStatus === 'revoked' || !hasPaid)) {
     return (
       <div className="min-h-screen relative flex items-center justify-center p-4 bg-slate-955">
         {/* Background glows */}
         <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-red-500/10 rounded-full blur-[80px]"></div>
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-brand-accent/5 rounded-full blur-[100px]"></div>
         
-        <div className="backdrop-blur-md bg-slate-900/60 border border-red-500/25 max-w-md w-full rounded-2xl shadow-2xl p-6 text-center z-10 relative">
+        <div className="backdrop-blur-md bg-slate-900/60 border border-slate-800 max-w-md w-full rounded-2xl shadow-2xl p-6 text-center z-10 relative">
           <div className="mx-auto w-14 h-14 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center text-red-500 mb-4 animate-pulse">
             <AlertCircle className="h-7 w-7" />
           </div>
           
-          <h2 className="text-xl font-extrabold text-slate-100">Access Suspended</h2>
+          <h2 className="text-xl font-extrabold text-slate-100">
+            {!hasPaid ? 'License Activation Required' : 'Access Suspended'}
+          </h2>
           <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-            Your subscription to <strong>Due Date</strong> has expired and is overdue by 10+ days. Please pay the subscription fee to restore full access to your member dashboard.
+            {!hasPaid 
+              ? 'Welcome to Due Date! To start managing your gym members, sending automated reminders, and using our digital ledger, please activate your monthly license.'
+              : 'Your subscription to Due Date has expired and is overdue by 10+ days. Please pay the subscription fee to restore full access to your member dashboard.'}
           </p>
           
           <div className="p-4 bg-slate-950/60 border border-slate-850 rounded-xl my-5 text-left">
@@ -222,14 +227,14 @@ function OwnerDashboard() {
             onClick={() => {
               setIsPayModalOpen(true);
             }}
-            className="w-full py-3 px-4 bg-red-650 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition duration-150 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-red-950/20"
+            className="w-full py-3 px-4 bg-brand-primary hover:bg-brand-primary-hover text-white font-bold rounded-xl text-xs transition duration-150 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-brand-primary/20"
           >
-            Pay Now & Restore Access
+            {!hasPaid ? 'Pay ₹699 & Activate License' : 'Pay Now & Restore Access'}
           </button>
           
           <button
             onClick={() => setShowLogoutConfirm(true)}
-            className="w-full mt-3 py-2 px-4 border border-slate-800 hover:bg-slate-800/50 text-slate-400 hover:text-slate-300 font-semibold rounded-xl text-xs transition cursor-pointer"
+            className="w-full mt-3 py-2 px-4 border border-slate-800 hover:bg-slate-800/50 text-slate-400 hover:text-slate-350 font-semibold rounded-xl text-xs transition cursor-pointer"
           >
             Log Out
           </button>

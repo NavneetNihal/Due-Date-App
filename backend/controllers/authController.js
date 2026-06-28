@@ -21,8 +21,8 @@ export const registerOwner = async (req, res) => {
       return res.status(400).json({ message: 'Email address already registered' });
     }
 
-    // Default subscription setup: Trial 30 days, status active
-    const subscriptionDueDate = addDays(formatDate(new Date()), 30);
+    // Default subscription setup: Must pay to activate license (due immediately)
+    const subscriptionDueDate = formatDate(new Date());
 
     const user = await User.create({
       name,
@@ -34,7 +34,7 @@ export const registerOwner = async (req, res) => {
       subscriptionStatus: 'active',
       pricingPlan: 'basic',
       subscriptionDueDate,
-      graceDaysRemaining: 10
+      graceDaysRemaining: 0
     });
 
     res.status(201).json({

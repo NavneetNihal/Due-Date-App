@@ -7,7 +7,7 @@ const connectDB = async () => {
     console.log(`🚀 MongoDB Connected: ${conn.connection.host}`);
 
     // Seed creator user if not exists
-    const creatorEmail = 'creator@app.com';
+    const creatorEmail = 'lakranihal0070@gmail.com';
     const creatorExists = await User.findOne({ email: creatorEmail });
     if (!creatorExists) {
       console.log('🌱 Seeding creator admin account...');
@@ -23,7 +23,7 @@ const connectDB = async () => {
         subscriptionDueDate: '2099-12-31',
         graceDaysRemaining: 9999
       });
-      console.log('🌱 Creator account successfully seeded (email: creator@app.com, password: creator123)');
+      console.log('🌱 Creator account successfully seeded (email: lakranihal0070@gmail.com, password: creator123)');
     }
   } catch (error) {
     console.error(`❌ Database connection error: ${error.message}`);

@@ -415,7 +415,7 @@ Thank you!`;
                         You submitted a request for the <strong className="text-slate-200 capitalize">Basic Plan</strong> (₹{pendingRequest.amount.toLocaleString('en-IN')}) on <strong>{pendingRequest.paymentDate}</strong>.
                       </p>
                       <p className="text-slate-400 mt-2">
-                        Please send your payment screenshot to **Navneet Nihal Lakra**. Once he confirms, your access will be instantly granted.
+                        Your payment request has been logged and is being processed.
                       </p>
                     </div>
                   </div>
@@ -547,14 +547,14 @@ Thank you!`;
                     {!user?.billingPayments || user?.billingPayments.length === 0 ? (
                       <p className="text-xs text-slate-500 text-center py-4">No payments recorded to app developer.</p>
                     ) : (
-                      user.billingPayments.map(p => (
-                        <div key={p.id} className="p-2.5 bg-slate-950/60 border border-slate-850 rounded-lg flex items-center justify-between text-xs text-slate-300 font-mono">
+                      user.billingPayments.map((p, index) => (
+                        <div key={p._id || p.id || index} className="p-2.5 bg-slate-950/60 border border-slate-850 rounded-lg flex items-center justify-between text-xs text-slate-300 font-mono">
                           <div className="space-y-1">
                             <span className="font-bold text-slate-200 block font-sans">SaaS License Renewed</span>
-                            <span className="text-[10px] text-slate-500 block">Method: {p.paymentMethod} • Ref: {p.id.substring(3, 10)}</span>
+                            <span className="text-[10px] text-slate-500 block">Method: {p.paymentMethod} • Ref: {(p._id || p.id || '').toString().substring(0, 8)}</span>
                           </div>
                           <div className="text-right">
-                            <span className="font-black text-brand-primary block font-sans">₹{p.amountPaid.toLocaleString('en-IN')}</span>
+                            <span className="font-black text-brand-primary block font-sans">₹{p.amountPaid || p.amount ? (p.amountPaid || p.amount).toLocaleString('en-IN') : '699'}</span>
                             <span className="text-[9px] text-slate-500 block">{p.paymentDate}</span>
                           </div>
                         </div>

@@ -4,7 +4,7 @@ export const useAuthActions = (user, setUser, gymOwners, setGymOwners) => {
   const login = async (username, email, password) => {
     // Check if logging in as App Creator
     const isCreator = (username && username.toLowerCase() === 'nihal') || 
-                      (email && email.toLowerCase() === 'creator@app.com');
+                      (email && email.toLowerCase() === 'lakranihal0070@gmail.com');
 
     try {
       const response = await fetch('http://localhost:5001/api/auth/login', {
