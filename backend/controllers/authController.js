@@ -9,6 +9,24 @@ const generateToken = (id) => {
   });
 };
 
+const formatUserResponse = (user) => ({
+  id: user._id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  businessName: user.businessName,
+  phone: user.phone,
+  subscriptionStatus: user.subscriptionStatus,
+  pricingPlan: user.pricingPlan,
+  subscriptionDueDate: user.subscriptionDueDate,
+  graceDaysRemaining: user.graceDaysRemaining,
+  isTrial: user.isTrial,
+  trialUsed: user.trialUsed,
+  settings: user.settings,
+  billingPayments: user.billingPayments,
+  allowedGyms: user.allowedGyms
+});
+
 // @desc    Register a new Gym Owner
 // @route   POST /api/auth/register
 // @access  Public
@@ -21,22 +39,7 @@ export const registerOwner = async (req, res) => {
       console.log(`🌱 Simple Auth: Auto-logging in existing user account for ${email} during registration...`);
       return res.status(200).json({
         token: generateToken(userExists._id),
-        user: {
-          id: userExists._id,
-          name: userExists.name,
-          email: userExists.email,
-          role: userExists.role,
-          businessName: userExists.businessName,
-          phone: userExists.phone,
-          subscriptionStatus: userExists.subscriptionStatus,
-          pricingPlan: userExists.pricingPlan,
-          subscriptionDueDate: userExists.subscriptionDueDate,
-          graceDaysRemaining: userExists.graceDaysRemaining,
-          isTrial: userExists.isTrial,
-          trialUsed: userExists.trialUsed,
-          settings: userExists.settings,
-          billingPayments: userExists.billingPayments
-        }
+        user: formatUserResponse(userExists)
       });
     }
 
@@ -58,22 +61,7 @@ export const registerOwner = async (req, res) => {
 
     res.status(201).json({
       token: generateToken(user._id),
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        businessName: user.businessName,
-        phone: user.phone,
-        subscriptionStatus: user.subscriptionStatus,
-        pricingPlan: user.pricingPlan,
-        subscriptionDueDate: user.subscriptionDueDate,
-        graceDaysRemaining: user.graceDaysRemaining,
-        isTrial: user.isTrial,
-        trialUsed: user.trialUsed,
-        settings: user.settings,
-        billingPayments: user.billingPayments
-      }
+      user: formatUserResponse(user)
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -117,22 +105,7 @@ export const loginUser = async (req, res) => {
 
     res.json({
       token: generateToken(user._id),
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        businessName: user.businessName,
-        phone: user.phone,
-        subscriptionStatus: user.subscriptionStatus,
-        pricingPlan: user.pricingPlan,
-        subscriptionDueDate: user.subscriptionDueDate,
-        graceDaysRemaining: user.graceDaysRemaining,
-        isTrial: user.isTrial,
-        trialUsed: user.trialUsed,
-        settings: user.settings,
-        billingPayments: user.billingPayments
-      }
+      user: formatUserResponse(user)
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -198,22 +171,7 @@ export const getUserProfile = async (req, res) => {
       await user.save();
     }
 
-    res.json({
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      businessName: user.businessName,
-      phone: user.phone,
-      subscriptionStatus: user.subscriptionStatus,
-      pricingPlan: user.pricingPlan,
-      subscriptionDueDate: user.subscriptionDueDate,
-      graceDaysRemaining: user.graceDaysRemaining,
-      isTrial: user.isTrial,
-      trialUsed: user.trialUsed,
-      settings: user.settings,
-      billingPayments: user.billingPayments
-    });
+    res.json(formatUserResponse(user));
   } catch (error) {
     console.error('Fetch profile error:', error);
     res.status(500).json({ message: 'Server error fetching profile' });

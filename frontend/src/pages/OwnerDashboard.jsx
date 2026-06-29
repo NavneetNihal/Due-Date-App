@@ -4,6 +4,8 @@ import { AppContext, formatDate } from '../context/AppContext.jsx';
 import MembersTable from '../components/MembersTable.jsx';
 import AddMemberModal from '../components/AddMemberModal.jsx';
 import OwnerPayModal from '../components/OwnerPayModal.jsx';
+import SettingsModal from '../components/SettingsModal.jsx';
+import AddGymOutletModal from '../components/AddGymOutletModal.jsx';
 import { usePaymentStore } from '../store/paymentStore.js';
 import { 
   Users, 
@@ -68,17 +70,7 @@ function OwnerDashboard() {
   const [directorySearchQuery, setDirectorySearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all'); // all, active, overdue, inactive
 
-  // Settings State
-  const [whatsappTemplate, setWhatsappTemplate] = useState(user?.settings?.whatsappTemplate || '');
-  const [paymentLink, setPaymentLink] = useState(user?.settings?.paymentLink || '');
-  const [reminderSchedule, setReminderSchedule] = useState(user?.settings?.reminderSchedule || 'standard');
-  const [upiId, setUpiId] = useState(user?.settings?.upiId || 'goldsgym@okaxis');
-  const [settingsSavedMessage, setSettingsSavedMessage] = useState(false);
-
-  const [addGymForm, setAddGymForm] = useState({
-    businessName: '', ownerName: '', phone1: '', phone2: '', address: '', pricingPlan: 'basic'
-  });
-
+  // Settings State (moved to SettingsModal)
   const today = formatDate(new Date());
   
   const { paymentStatus, syncPaymentStatus } = usePaymentStore();
@@ -129,15 +121,6 @@ function OwnerDashboard() {
       }
     }
   }, [ownerOutlets, activeOutletId, setActiveOutletId]);
-
-  useEffect(() => {
-    if (user?.settings) {
-      setWhatsappTemplate(user.settings.whatsappTemplate || '');
-      setPaymentLink(user.settings.paymentLink || '');
-      setReminderSchedule(user.settings.reminderSchedule || 'standard');
-      setUpiId(user.settings.upiId || 'goldsgym@okaxis');
-    }
-  }, [user?.settings]);
 
   useEffect(() => {
     if (user && user.subscriptionStatus === 'overdue') {
@@ -192,15 +175,7 @@ function OwnerDashboard() {
     return true;
   });
 
-  const handleSaveSettings = (e) => {
-    e.preventDefault();
-    updateSettings({ whatsappTemplate, paymentLink, reminderSchedule, upiId });
-    setSettingsSavedMessage(true);
-    setTimeout(() => {
-      setSettingsSavedMessage(false);
-      setIsSettingsOpen(false);
-    }, 1500);
-  };
+
 
   return (
     <div className="min-h-screen pb-12">
@@ -625,129 +600,12 @@ function OwnerDashboard() {
       </main>
 
       {/* Settings Modal */}
-      {isSettingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-850">
-              <h3 className="text-lg font-bold text-slate-100">Automation Settings</h3>
-              <button 
-                onClick={() => setIsSettingsOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveSettings} className="mt-4 space-y-4">
-              
-              {/* Payment Link */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                  Default Payment Link (UPI / Razorpay)
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                    <LinkIcon className="h-4 w-4" />
-                  </div>
-                  <input
-                    type="url"
-                    value={paymentLink}
-                    onChange={(e) => setPaymentLink(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-slate-950/60 border border-slate-800 rounded-lg text-slate-350 focus:outline-none focus:border-brand-primary text-xs"
-                    placeholder="https://upi.link/yourgym"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* UPI ID */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                  UPI ID for Direct Transfers
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-550">
-                    <IndianRupee className="h-4 w-4" />
-                  </div>
-                  <input
-                    type="text"
-                    value={upiId}
-                    onChange={(e) => setUpiId(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-slate-955/60 border border-slate-800 rounded-lg text-slate-350 focus:outline-none focus:border-brand-primary text-xs"
-                    placeholder="goldsgym@okaxis"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Reminder Schedule Model */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                  WhatsApp Reminder Schedule
-                </label>
-                <select
-                  value={reminderSchedule}
-                  onChange={(e) => setReminderSchedule(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 rounded-lg text-slate-300 focus:outline-none focus:border-brand-primary text-xs"
-                >
-                  <option value="standard">Standard: 7d Before, On Due, then overdue 3, 7, and 10 days</option>
-                  <option value="interval">Aggressive: On Due Date, overdue 1 day, 3 days, then every 3 days</option>
-                </select>
-                <p className="text-[9px] text-slate-500 mt-0.5 leading-relaxed">
-                  Choose exactly when overdue members will receive automated WhatsApp pings.
-                </p>
-              </div>
-
-              {/* WhatsApp Template */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                  WhatsApp Message Template
-                </label>
-                <div className="relative">
-                  <div className="absolute top-3 left-3 pointer-events-none text-slate-550">
-                    <MessageSquare className="h-4 w-4" />
-                  </div>
-                  <textarea
-                    rows="4"
-                    value={whatsappTemplate}
-                    onChange={(e) => setWhatsappTemplate(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-slate-950/60 border border-slate-800 rounded-lg text-slate-300 focus:outline-none focus:border-brand-primary text-xs"
-                    placeholder="Enter message template..."
-                    required
-                  ></textarea>
-                </div>
-                <div className="p-2 bg-slate-950/40 rounded border border-slate-850 text-[10px] text-slate-450 leading-relaxed">
-                  <span className="font-bold text-slate-300 block mb-1">Available placeholders:</span>
-                  `{name}`: Member's name • `{amount}`: Price • `{due_date}`: Next due date • `{upi_id}`: Your UPI ID • `{payment_link}`: Custom payment link
-                </div>
-              </div>
-
-              {settingsSavedMessage && (
-                <div className="p-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs rounded text-center">
-                  Settings saved successfully!
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="pt-4 flex gap-3 border-t border-slate-850">
-                <button
-                  type="button"
-                  onClick={() => setIsSettingsOpen(false)}
-                  className="flex-1 py-2 px-4 border border-slate-850 hover:bg-slate-800/50 text-slate-350 font-semibold rounded-lg text-xs transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 px-4 bg-brand-primary hover:bg-brand-primary-hover text-white font-semibold rounded-lg text-xs shadow-md transition cursor-pointer"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+        user={user} 
+        updateSettings={updateSettings} 
+      />
 
       {/* History Modal (Immutable Ledger Log) */}
       {isHistoryOpen && (
@@ -969,143 +827,13 @@ function OwnerDashboard() {
       )}
 
       {/* Add Gym Outlet Modal (Accessible to Owners) */}
-      {isAddGymOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-purple-500/20 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-black text-slate-100 flex items-center gap-2">
-                  <Building className="h-4 w-4 text-purple-400" />
-                  {gymLimitReached ? 'Upgrade Plan Required' : 'Add New Gym Outlet'}
-                </h3>
-                <p className="text-[10px] text-slate-500 mt-0.5">
-                  {gymLimitReached ? 'Multi-gym support is only active on the 2-Gym location license.' : 'Register a new gym branch/outlet under your account.'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsAddGymOpen(false)}
-                className="text-slate-500 hover:text-slate-300 p-1 rounded hover:bg-slate-800 transition cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {gymLimitReached ? (
-              <div className="py-6 text-center space-y-4 animate-in fade-in duration-200">
-                <div className="mx-auto w-12 h-12 bg-purple-500/10 border border-purple-500/25 rounded-full flex items-center justify-center text-purple-450 mb-1 animate-bounce">
-                  <AlertCircle className="h-6 w-6" />
-                </div>
-                <h4 className="text-sm font-extrabold text-slate-105">Gym License Capacity Reached</h4>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Your account is licensed for <strong className="text-slate-200">{user?.allowedGyms || 1} gym location(s)</strong>. 
-                  You already have <strong className="text-slate-200">{ownerOutlets.length} active location(s)</strong>.
-                </p>
-                <p className="text-xs text-slate-500 font-medium">
-                  Please purchase a <strong>2-Gym Location Support License</strong> in your profile settings tab to register another branch.
-                </p>
-                
-                <div className="pt-4 flex gap-3 border-t border-slate-850">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddGymOpen(false)}
-                    className="flex-1 py-2 px-4 border border-slate-800 hover:bg-slate-800 text-slate-400 font-bold rounded-xl text-xs transition cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAddGymOpen(false);
-                      navigate('/profile?tab=billing');
-                    }}
-                    className="flex-1 py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition cursor-pointer shadow-lg shadow-purple-900/10 animate-pulse"
-                  >
-                    Go to Billing
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!addGymForm.businessName.trim() || !addGymForm.phone1.trim()) return;
-                  addGymOwner({
-                    ...addGymForm,
-                    ownerName: user?.name
-                  });
-                  setAddGymForm({ businessName: '', ownerName: '', phone1: '', phone2: '', address: '', pricingPlan: 'basic' });
-                  setIsAddGymOpen(false);
-                }}
-                className="space-y-4"
-              >
-              {/* Business / Outlet Name */}
-              <div className="space-y-1">
-                <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Gym / Outlet Name *</label>
-                <input
-                  type="text"
-                  value={addGymForm.businessName}
-                  onChange={e => setAddGymForm(f => ({ ...f, businessName: e.target.value }))}
-                  placeholder="e.g. Gold's Gym Downtown"
-                  required
-                  className="w-full px-3 py-2 bg-slate-955/60 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:border-purple-500 text-xs"
-                />
-              </div>
-
-              {/* Two Phone Numbers */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Primary Phone *</label>
-                  <input
-                    type="tel"
-                    value={addGymForm.phone1}
-                    onChange={e => setAddGymForm(f => ({ ...f, phone1: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
-                    placeholder="9876543210"
-                    maxLength={10}
-                    pattern="[0-9]{10}"
-                    required
-                    className="w-full px-3 py-2 bg-slate-955/60 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:border-purple-500 text-xs font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Secondary Phone</label>
-                  <input
-                    type="tel"
-                    value={addGymForm.phone2}
-                    onChange={e => setAddGymForm(f => ({ ...f, phone2: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
-                    placeholder="Optional"
-                    maxLength={10}
-                    pattern="[0-9]{10}"
-                    className="w-full px-3 py-2 bg-slate-955/60 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:border-purple-500 text-xs font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Address */}
-              <div className="space-y-1">
-                <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Gym Address</label>
-                <textarea
-                  value={addGymForm.address}
-                  onChange={e => setAddGymForm(f => ({ ...f, address: e.target.value }))}
-                  placeholder="Street, City, State, PIN"
-                  rows={2}
-                  className="w-full px-3 py-2 bg-slate-955/60 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:border-purple-500 text-xs resize-none"
-                />
-              </div>
-
-
-
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-lg shadow-purple-900/20"
-              >
-                Register Gym Outlet
-              </button>
-            </form>
-            )}
-          </div>
-        </div>
-      )}
+      <AddGymOutletModal 
+        isOpen={isAddGymOpen} 
+        onClose={() => setIsAddGymOpen(false)} 
+        user={user} 
+        ownerOutlets={ownerOutlets} 
+        addGymOwner={addGymOwner} 
+      />
 
       {/* ── Sign Out Confirmation Modal ── */}
       {showLogoutConfirm && (
