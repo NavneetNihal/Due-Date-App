@@ -45,6 +45,54 @@ export const AppProvider = ({ children }) => {
       const token = localStorage.getItem('jwt_token');
       if (!token || !user) return;
 
+      const loadMockLocalData = () => {
+        const localGymOwners = localStorage.getItem('mock_gym_owners');
+        const localBillingRequests = localStorage.getItem('mock_billing_requests');
+        const localMembers = localStorage.getItem('mock_members');
+        const localPayments = localStorage.getItem('mock_payments');
+
+        if (localGymOwners) {
+          setGymOwners(JSON.parse(localGymOwners));
+        }
+        if (localBillingRequests) {
+          setBillingRequests(JSON.parse(localBillingRequests));
+        }
+        if (localMembers) {
+          const mems = JSON.parse(localMembers);
+          setMembers(mems.filter(m => (m.gymId || 'owner_golds') === (activeOutletId || 'owner_golds')));
+        }
+        if (localPayments) {
+          const pays = JSON.parse(localPayments);
+          setPayments(pays.filter(p => (p.gymId || 'owner_golds') === (activeOutletId || 'owner_golds')));
+        }
+
+        // Sync current logged-in owner profile from local registry
+        if (user && user.role === 'owner') {
+          const ownersList = localGymOwners ? JSON.parse(localGymOwners) : [];
+          const ownerEntry = ownersList.find(o => o.id === user.id || o.name === user.name || o.email === user.email);
+          if (ownerEntry) {
+            if (
+              user.pricingPlan !== ownerEntry.pricingPlan ||
+              user.allowedGyms !== ownerEntry.allowedGyms ||
+              user.subscriptionStatus !== ownerEntry.subscriptionStatus ||
+              user.subscriptionDueDate !== ownerEntry.subscriptionDueDate ||
+              JSON.stringify(user.billingPayments) !== JSON.stringify(ownerEntry.billingPayments)
+            ) {
+              const updated = {
+                ...user,
+                pricingPlan: ownerEntry.pricingPlan,
+                allowedGyms: ownerEntry.allowedGyms,
+                subscriptionStatus: ownerEntry.subscriptionStatus,
+                subscriptionDueDate: ownerEntry.subscriptionDueDate,
+                billingPayments: ownerEntry.billingPayments
+              };
+              setUser(updated);
+              localStorage.setItem('owner_user', JSON.stringify(updated));
+            }
+          }
+        }
+      };
+
       setLoading(true);
       try {
         // Fetch Profile
@@ -93,10 +141,22 @@ export const AppProvider = ({ children }) => {
               const paymentsData = await paymentsResp.json();
               setPayments(paymentsData.map(p => ({ ...p, id: p._id || p.id })));
             }
+
+            // Fetch owner's billing requests for persistence
+            const ledgerResp = await fetch('http://localhost:5001/api/creator/ledger', {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (ledgerResp.ok) {
+              const ledgerData = await ledgerResp.json();
+              setBillingRequests(ledgerData.logs.map(r => ({ ...r, id: r._id || r.id })));
+            }
           }
+        } else {
+          loadMockLocalData();
         }
       } catch (err) {
-        console.error('Initial async data fetch error:', err);
+        console.warn('Initial async data fetch error, loading from localStorage fallback:', err);
+        loadMockLocalData();
       } finally {
         setLoading(false);
       }

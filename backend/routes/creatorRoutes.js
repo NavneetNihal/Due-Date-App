@@ -8,7 +8,8 @@ import {
   updateDeveloperSettings, 
   getPlatformLedger, 
   submitSaaSRenewal,
-  reverseClientPayment
+  reverseClientPayment,
+  updateBillingRequestStatus
 } from '../controllers/creatorController.js';
 import { protect, authorizeRoles } from '../middleware/auth.js';
 
@@ -30,6 +31,7 @@ router.post('/checkout', authorizeRoles('owner'), submitSaaSRenewal);
 router.get('/stats', authorizeRoles('creator'), getPlatformStats);
 router.get('/clients', authorizeRoles('creator'), getPlatformClients);
 router.put('/clients/:id/status', authorizeRoles('creator'), updateClientSubscriptionStatus);
+router.put('/requests/:id', authorizeRoles('creator'), updateBillingRequestStatus);
 router.post('/clients/:id/reverse', authorizeRoles('creator'), reverseClientPayment);
 router.delete('/clients/:id', authorizeRoles('creator'), deleteClient);
 router.put('/settings', authorizeRoles('creator'), updateDeveloperSettings);

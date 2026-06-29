@@ -186,8 +186,8 @@ export const updateDeveloperSettings = async (req, res) => {
 // @access  Private (Creator/Owner Shared)
 export const getPlatformLedger = async (req, res) => {
   try {
-    // If owner, only fetch their requests
-    let filter = { status: 'approved' };
+    // If owner, only fetch their requests. If creator, fetch all requests.
+    let filter = {};
     if (req.user.role === 'owner') {
       filter = { ownerId: req.user._id };
     }
@@ -221,41 +221,21 @@ export const submitSaaSRenewal = async (req, res) => {
     }
 
     const todayStr = formatDate(new Date());
-    const baseDate = new Date(user.subscriptionDueDate) > new Date(todayStr)
-      ? user.subscriptionDueDate
-      : todayStr;
 
-    const extendedDate = addDays(baseDate, 30);
-
-    // Create the billing request as APPROVED instantly (matching direct self-serve rule)
+    // Create the billing request as PENDING
     const billingReq = await BillingRequest.create({
       ownerId: user._id,
       ownerName: user.name,
       businessName: user.businessName,
       amount: 699,
-      status: 'approved',
+      status: 'pending',
       requestDate: todayStr,
       upiTxnId: upiTxnId || 'Direct Pay',
       notes: notes || 'Subscription renewal payment'
     });
 
-    // Update owner user parameters
-    user.subscriptionStatus = 'active';
-    user.subscriptionDueDate = extendedDate;
-    user.graceDaysRemaining = 10;
-    user.totalPaidToCreator = (user.totalPaidToCreator || 0) + 699;
-    user.billingPayments.push({
-      amount: 699,
-      paymentDate: todayStr,
-      paymentMethod: 'UPI',
-      notes: notes || 'Subscription renewal payment',
-      upiTxnId: upiTxnId || 'Direct Pay'
-    });
-
-    await user.save();
-
     res.status(201).json({
-      message: 'SaaS payment processed successfully. License activated!',
+      message: 'SaaS payment request submitted successfully. Awaiting creator approval.',
       user: {
         id: user._id,
         subscriptionStatus: user.subscriptionStatus,
@@ -330,5 +310,74 @@ export const reverseClientPayment = async (req, res) => {
   } catch (error) {
     console.error('Reverse client payment error:', error);
     res.status(500).json({ message: 'Server error reversing client payment' });
+  }
+};
+
+// @desc    Approve/Reject inbound billing request
+// @route   PUT /api/creator/requests/:id
+// @access  Private (Creator Only)
+export const updateBillingRequestStatus = async (req, res) => {
+  const { status } = req.body; // 'approved' or 'rejected'
+  
+  try {
+    const billingReq = await BillingRequest.findById(req.params.id);
+    if (!billingReq) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    billingReq.status = status;
+    await billingReq.save();
+
+    if (status === 'approved') {
+      // Find the client owner
+      const client = await User.findById(billingReq.ownerId);
+      if (client) {
+        const todayStr = formatDate(new Date());
+        client.subscriptionStatus = 'active';
+        client.graceDaysRemaining = 10;
+        
+        // Calculate next subscription due date
+        const isExpired = client.subscriptionStatus === 'overdue' || 
+                          client.subscriptionStatus === 'revoked' || 
+                          client.subscriptionStatus === 'unpaid' ||
+                          !client.subscriptionDueDate ||
+                          new Date(client.subscriptionDueDate) < new Date(todayStr);
+                          
+        const baseDate = isExpired ? todayStr : client.subscriptionDueDate;
+        const newDueDate = addDays(baseDate, 30);
+        
+        client.subscriptionDueDate = newDueDate;
+        client.totalPaidToCreator = (client.totalPaidToCreator || 0) + billingReq.amount;
+        
+        // Add to billingPayments
+        client.billingPayments.push({
+          amount: billingReq.amount,
+          paymentDate: todayStr,
+          paymentMethod: 'UPI',
+          notes: billingReq.notes || 'UPI Payment approved by creator'
+        });
+
+        // Parse requested plan and allowed gyms from notes if present
+        const notesText = billingReq.notes || '';
+        if (notesText.includes('Plan: growth')) {
+          client.pricingPlan = 'growth';
+        } else if (notesText.includes('Plan: basic') || notesText.includes('Plan: starter')) {
+          client.pricingPlan = 'basic';
+        }
+
+        if (notesText.includes('Gyms: 2')) {
+          client.allowedGyms = 2;
+        } else if (notesText.includes('Gyms: 1')) {
+          client.allowedGyms = 1;
+        }
+
+        await client.save();
+      }
+    }
+
+    res.json({ message: `Request successfully ${status}`, request: billingReq });
+  } catch (error) {
+    console.error('Update request status error:', error);
+    res.status(500).json({ message: 'Server error updating request status' });
   }
 };

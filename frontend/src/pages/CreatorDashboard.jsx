@@ -31,18 +31,12 @@ function CreatorDashboard() {
     deleteGymOwner, 
     addGymOwner,
     updateGymOwnerStatus,
-    members: allMembers,
     billingRequests,
     approveBillingRequest,
     rejectBillingRequest,
-    addMember,
-    deleteMember
+    members: allMembers
   } = useContext(AppContext);
   const navigate = useNavigate();
-  const [expandedOwnerMembers, setExpandedOwnerMembers] = useState(null); // ownerId
-  const [creatorAddMemberForm, setCreatorAddMemberForm] = useState({
-    name: '', phoneNumber: '', subscriptionTier: 'monthly', subscriptionAmount: 1000, joiningDate: formatDate(new Date()), isPaid: false
-  });
 
   // Redirect if not creator
   useEffect(() => {
@@ -467,8 +461,60 @@ function CreatorDashboard() {
             </div>
           </div>
 
-          {/* RIGHT: Gym Owners Subscription registry */}
           <div className="lg:col-span-2 space-y-4">
+            {/* Pending Inbound Payment Requests */}
+            {(() => {
+              const pendingRequests = billingRequests?.filter(r => r.status === 'pending') || [];
+
+              return (
+                <div className="backdrop-blur-md bg-slate-900/40 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between pb-2.5 border-b border-slate-850">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-200 flex items-center gap-1.5">
+                      <AlertCircle className="h-4 w-4 text-amber-500 animate-pulse" />
+                      Pending License Requests ({pendingRequests.length})
+                    </span>
+                    <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">Manual Approve Required</span>
+                  </div>
+
+                  {pendingRequests.length === 0 ? (
+                    <div className="text-center py-6 text-slate-500 italic text-[10px]">
+                      No pending payment logs to verify. When gym owners pay and confirm checkout, they will appear here.
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
+                      {pendingRequests.map(req => (
+                        <div key={req._id || req.id} className="p-3 bg-slate-955/60 border border-slate-850 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <strong className="text-slate-100 font-sans">{req.businessName}</strong>
+                              <span className="px-1 py-0.5 bg-slate-900 border border-slate-800 rounded text-[8px] font-semibold text-slate-450 uppercase">
+                                {req.notes || 'Basic'}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-500 block">Owner: {req.ownerName}</span>
+                            <span className="text-[10px] text-slate-455 block font-mono">Date: {req.requestDate}</span>
+                          </div>
+                          <div className="flex items-center gap-2 self-end sm:self-center">
+                            <button
+                              onClick={() => rejectBillingRequest(req._id || req.id)}
+                              className="px-2.5 py-1.5 border border-slate-800 hover:border-red-500/30 hover:bg-red-500/5 text-slate-450 hover:text-red-400 font-bold text-[9px] rounded-lg transition cursor-pointer"
+                            >
+                              Decline
+                            </button>
+                            <button
+                              onClick={() => approveBillingRequest(req._id || req.id)}
+                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[9px] rounded-lg transition cursor-pointer active:scale-95 shadow-md shadow-emerald-955/15"
+                            >
+                              Approve & Unlock
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             <div className="backdrop-blur-md bg-slate-900/40 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl space-y-5">
               
@@ -669,148 +715,6 @@ function CreatorDashboard() {
                           </div>
 
                         </div>
-                      </div>
-
-                      {/* Collapsible Member Management for Creator */}
-                      <div className="border-t border-slate-900 pt-3">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (expandedOwnerMembers === owner.id) {
-                              setExpandedOwnerMembers(null);
-                            } else {
-                              setExpandedOwnerMembers(owner.id);
-                              setCreatorAddMemberForm({
-                                name: '', phoneNumber: '', subscriptionTier: 'monthly', subscriptionAmount: 1000, joiningDate: formatDate(new Date()), isPaid: false
-                              });
-                            }
-                          }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-750 text-slate-350 hover:text-slate-200 text-[10px] font-bold rounded-lg transition cursor-pointer"
-                        >
-                          <Users className="h-3 w-3 text-purple-400" />
-                          {expandedOwnerMembers === owner.id ? 'Hide Members List' : 'Manage Members / Add Member'}
-                        </button>
-
-                        {expandedOwnerMembers === owner.id && (
-                          <div className="mt-3 bg-slate-955/40 border border-slate-900 rounded-xl p-3 space-y-3 animate-in fade-in duration-200">
-                            <h5 className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Gym Members Database</h5>
-                            
-                            {/* Member list */}
-                            <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1">
-                              {allMembers.filter(m => (m.gymId || 'owner_golds') === owner.id).length === 0 ? (
-                                <p className="text-[10px] text-slate-500 italic py-2">No members registered in this gym yet.</p>
-                              ) : (
-                                allMembers.filter(m => (m.gymId || 'owner_golds') === owner.id).map(m => (
-                                  <div key={m.id} className="flex items-center justify-between p-2 bg-slate-950/70 border border-slate-900 rounded-lg text-[10px]">
-                                    <div>
-                                      <span className="font-bold text-slate-200 block">{m.name}</span>
-                                      <span className="text-slate-500 text-[9px] block font-mono">{m.phoneNumber} • Due: {m.nextDueDate}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className={`px-1.5 py-0.2 rounded text-[8px] font-bold uppercase ${
-                                        m.status === 'active' 
-                                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                                          : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                                      }`}>
-                                        {m.status}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          if (confirm(`Are you sure you want to delete member ${m.name}?`)) {
-                                            deleteMember(m.id);
-                                          }
-                                        }}
-                                        className="p-1 border border-slate-805 hover:border-red-500/30 hover:bg-red-500/10 text-slate-400 hover:text-red-400 rounded transition cursor-pointer"
-                                      >
-                                        <X className="h-2.5 w-2.5" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))
-                              )}
-                            </div>
-
-                            {/* Add Member inline form */}
-                            <div className="border-t border-slate-900/60 pt-3 space-y-2">
-                              <span className="text-[9px] text-slate-450 font-black uppercase tracking-wider block">Add Member Dynamically</span>
-                              <div className="grid grid-cols-2 gap-2">
-                                <input
-                                  type="text"
-                                  placeholder="Full Name"
-                                  value={creatorAddMemberForm.name}
-                                  onChange={e => setCreatorAddMemberForm(f => ({ ...f, name: e.target.value }))}
-                                  className="px-2 py-1.5 bg-slate-950/70 border border-slate-850 rounded-lg text-slate-200 text-[10px] focus:outline-none focus:border-purple-500"
-                                />
-                                <input
-                                  type="text"
-                                  placeholder="Phone Number (10 digits)"
-                                  value={creatorAddMemberForm.phoneNumber}
-                                  onChange={e => setCreatorAddMemberForm(f => ({ ...f, phoneNumber: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
-                                  className="px-2 py-1.5 bg-slate-955/70 border border-slate-850 rounded-lg text-slate-200 text-[10px] focus:outline-none focus:border-purple-500"
-                                />
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="text-[8px] text-slate-500 font-bold block mb-0.5">Tier</label>
-                                  <select
-                                    value={creatorAddMemberForm.subscriptionTier}
-                                    onChange={e => {
-                                      const tier = e.target.value;
-                                      let amount = 1000;
-                                      if (tier === 'quarterly') amount = 2500;
-                                      else if (tier === 'yearly') amount = 8000;
-                                      setCreatorAddMemberForm(f => ({ ...f, subscriptionTier: tier, subscriptionAmount: amount }));
-                                    }}
-                                    className="w-full px-2 py-1 bg-slate-950/70 border border-slate-850 rounded-lg text-slate-300 text-[10px] focus:outline-none focus:border-purple-500 cursor-pointer"
-                                  >
-                                    <option value="monthly">Monthly (₹1,000)</option>
-                                    <option value="quarterly">Quarterly (₹2,500)</option>
-                                    <option value="yearly">Yearly (₹8,000)</option>
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="text-[8px] text-slate-500 font-bold block mb-0.5">Custom Amount (₹)</label>
-                                  <input
-                                    type="number"
-                                    value={creatorAddMemberForm.subscriptionAmount}
-                                    onChange={e => setCreatorAddMemberForm(f => ({ ...f, subscriptionAmount: e.target.value }))}
-                                    className="w-full px-2 py-1 bg-slate-950/70 border border-slate-850 rounded-lg text-slate-200 text-[10px] focus:outline-none focus:border-purple-500"
-                                  />
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (!creatorAddMemberForm.name.trim() || !creatorAddMemberForm.phoneNumber.trim()) {
-                                    alert("Please fill name and phone number");
-                                    return;
-                                  }
-                                  
-                                  let days = 30;
-                                  if (creatorAddMemberForm.subscriptionTier === 'quarterly') days = 90;
-                                  else if (creatorAddMemberForm.subscriptionTier === 'yearly') days = 365;
-
-                                  const nextDueDate = addDays(creatorAddMemberForm.joiningDate, days);
-                                  
-                                  addMember({
-                                    ...creatorAddMemberForm,
-                                    nextDueDate,
-                                    gymId: owner.id
-                                  });
-
-                                  setCreatorAddMemberForm({
-                                    name: '', phoneNumber: '', subscriptionTier: 'monthly', subscriptionAmount: 1000, joiningDate: formatDate(new Date()), isPaid: false
-                                  });
-                                }}
-                                className="w-full py-1.5 bg-purple-600 hover:bg-purple-750 text-white font-bold text-[10px] rounded-lg transition cursor-pointer shadow-sm shadow-purple-900/10"
-                              >
-                                Create Member
-                              </button>
-                            </div>
-
-                          </div>
-                        )}
                       </div>
 
                       {/* Delete Gym Button */}

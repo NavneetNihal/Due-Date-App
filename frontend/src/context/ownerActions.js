@@ -33,7 +33,29 @@ export const useOwnerActions = (
         return true;
       }
     } catch (err) {
-      console.error('Update client status API error:', err);
+      console.warn('Update client status API error, falling back to mock:', err);
+      
+      const savedOwners = localStorage.getItem('mock_gym_owners');
+      let ownersList = savedOwners ? JSON.parse(savedOwners) : [];
+      ownersList = ownersList.map(o => {
+        if (o.id === ownerId) {
+          const updated = {
+            ...o,
+            subscriptionStatus: newStatus || o.subscriptionStatus,
+            pricingPlan: newPlan || o.pricingPlan,
+            allowedGyms: newAllowedGyms !== undefined ? newAllowedGyms : o.allowedGyms
+          };
+          if (user && user.id === ownerId) {
+            setUser(updated);
+            localStorage.setItem('owner_user', JSON.stringify(updated));
+          }
+          return updated;
+        }
+        return o;
+      });
+      localStorage.setItem('mock_gym_owners', JSON.stringify(ownersList));
+      setGymOwners(ownersList);
+      return true;
     }
     return false;
   };
@@ -47,9 +69,13 @@ export const useOwnerActions = (
     if (!owner) return false;
 
     const todayStr = formatDate(new Date());
-    const currentDueDate = owner.subscriptionDueDate || todayStr;
-    const isOverdue = owner.subscriptionStatus === 'overdue' || owner.subscriptionStatus === 'revoked' || new Date(currentDueDate) < new Date(todayStr);
-    const baseDate = isOverdue ? todayStr : currentDueDate;
+    const isExpired = owner.subscriptionStatus === 'overdue' || 
+                      owner.subscriptionStatus === 'revoked' || 
+                      owner.subscriptionStatus === 'unpaid' ||
+                      !owner.subscriptionDueDate ||
+                      new Date(owner.subscriptionDueDate) < new Date(todayStr);
+                      
+    const baseDate = isExpired ? todayStr : owner.subscriptionDueDate;
     const newDueDate = addDays(baseDate, 30);
 
     try {
@@ -81,7 +107,58 @@ export const useOwnerActions = (
         return true;
       }
     } catch (err) {
-      console.error('Mark gym owner paid API error:', err);
+      console.warn('Mark gym owner paid API error, falling back to mock:', err);
+      
+      const savedOwners = localStorage.getItem('mock_gym_owners');
+      let ownersList = savedOwners ? JSON.parse(savedOwners) : [];
+      ownersList = ownersList.map(o => {
+        if (o.id === ownerId) {
+          const updated = {
+            ...o,
+            subscriptionStatus: 'active',
+            subscriptionDueDate: newDueDate,
+            totalPaidToCreator: (o.totalPaidToCreator || 0) + 699,
+            billingPayments: [
+              ...(o.billingPayments || []),
+              {
+                amount: 699,
+                paymentDate: todayStr,
+                paymentMethod: 'UPI',
+                notes: 'Manual payment approval by creator'
+              }
+            ]
+          };
+          if (user && user.id === ownerId) {
+            setUser(updated);
+            localStorage.setItem('owner_user', JSON.stringify(updated));
+          }
+          return updated;
+        }
+        return o;
+      });
+      localStorage.setItem('mock_gym_owners', JSON.stringify(ownersList));
+      setGymOwners(ownersList);
+
+      // Create mock approved billing log
+      const newLog = {
+        id: `mock_req_${Date.now()}`,
+        _id: `mock_req_${Date.now()}`,
+        ownerId: ownerId,
+        ownerName: owner.name,
+        businessName: owner.businessName,
+        amount: 699,
+        status: 'approved',
+        requestDate: todayStr,
+        upiTxnId: 'MANUAL_CREATOR_APPROVE_MOCK',
+        notes: 'Manual payment approval by creator'
+      };
+
+      const savedReqs = localStorage.getItem('mock_billing_requests');
+      let reqsList = savedReqs ? JSON.parse(savedReqs) : [];
+      reqsList.unshift(newLog);
+      localStorage.setItem('mock_billing_requests', JSON.stringify(reqsList));
+      setBillingRequests(reqsList);
+      return true;
     }
     return false;
   };
@@ -112,7 +189,39 @@ export const useOwnerActions = (
         return true;
       }
     } catch (err) {
-      console.error('Reverse gym owner payment API error:', err);
+      console.warn('Reverse gym owner payment API error, falling back to mock:', err);
+      
+      const savedOwners = localStorage.getItem('mock_gym_owners');
+      let ownersList = savedOwners ? JSON.parse(savedOwners) : [];
+      ownersList = ownersList.map(o => {
+        if (o.id === ownerId) {
+          if (!o.billingPayments || o.billingPayments.length === 0) return o;
+          const lastPayment = o.billingPayments[o.billingPayments.length - 1];
+          const newPayments = [...o.billingPayments];
+          newPayments.pop();
+
+          const todayStr = formatDate(new Date());
+          const oldDueDate = o.subscriptionDueDate || todayStr;
+          const newDueDate = addDays(oldDueDate, -30);
+
+          const updated = {
+            ...o,
+            subscriptionDueDate: newDueDate,
+            totalPaidToCreator: Math.max(0, (o.totalPaidToCreator || 0) - (lastPayment.amount || 699)),
+            billingPayments: newPayments
+          };
+
+          if (user && user.id === ownerId) {
+            setUser(updated);
+            localStorage.setItem('owner_user', JSON.stringify(updated));
+          }
+          return updated;
+        }
+        return o;
+      });
+      localStorage.setItem('mock_gym_owners', JSON.stringify(ownersList));
+      setGymOwners(ownersList);
+      return true;
     }
     return false;
   };
@@ -132,7 +241,14 @@ export const useOwnerActions = (
         return true;
       }
     } catch (err) {
-      console.error('Delete client API error:', err);
+      console.warn('Delete client API error, falling back to mock:', err);
+      
+      const savedOwners = localStorage.getItem('mock_gym_owners');
+      let ownersList = savedOwners ? JSON.parse(savedOwners) : [];
+      ownersList = ownersList.filter(o => o.id !== ownerId);
+      localStorage.setItem('mock_gym_owners', JSON.stringify(ownersList));
+      setGymOwners(ownersList);
+      return true;
     }
     return false;
   };
@@ -162,14 +278,40 @@ export const useOwnerActions = (
         };
         setGymOwners(prev => [newOwnerEnriched, ...prev]);
 
-        // If called by an Owner themselves to create a new gym outlet (allowedGyms logic)
         if (user && user.role === 'owner') {
           setActiveOutletId(data.user.id);
         }
         return true;
       }
     } catch (err) {
-      console.error('Add gym owner API error:', err);
+      console.warn('Add gym owner API error, falling back to mock:', err);
+      
+      const todayStr = formatDate(new Date());
+      const newMockOwner = {
+        id: `mock_owner_${Date.now()}`,
+        name: ownerData.ownerName || 'Gym Owner',
+        email: ownerData.email || `gym_${Date.now()}@test.com`,
+        businessName: ownerData.businessName,
+        phone: ownerData.phone1 || '9999988888',
+        subscriptionStatus: 'unpaid',
+        pricingPlan: 'basic',
+        subscriptionDueDate: todayStr,
+        allowedGyms: 1,
+        totalPaidToCreator: 0,
+        registeredMembersCount: 0,
+        billingPayments: []
+      };
+
+      const savedOwners = localStorage.getItem('mock_gym_owners');
+      let ownersList = savedOwners ? JSON.parse(savedOwners) : [];
+      ownersList.unshift(newMockOwner);
+      localStorage.setItem('mock_gym_owners', JSON.stringify(ownersList));
+      setGymOwners(ownersList);
+
+      if (user && user.role === 'owner') {
+        setActiveOutletId(newMockOwner.id);
+      }
+      return true;
     }
     return false;
   };
@@ -193,7 +335,6 @@ export const useOwnerActions = (
       if (response.ok) {
         const data = await response.json(); // returns { user, billingRequest }
         
-        // Update context user with fresh subscription coordinates
         setUser(prev => {
           if (!prev) return null;
           const updated = {
@@ -207,34 +348,164 @@ export const useOwnerActions = (
           return updated;
         });
 
-        // Add request to local billingRequests
         setBillingRequests(prev => [data.billingRequest, ...prev]);
         return true;
       }
     } catch (err) {
-      console.error('Submit billing request API error:', err);
+      console.warn('Submit billing request API error, falling back to mock:', err);
+      
+      const newRequest = {
+        id: `mock_req_${Date.now()}`,
+        _id: `mock_req_${Date.now()}`,
+        ownerId: user.id || user._id,
+        ownerName: user.name,
+        businessName: user.businessName,
+        amount: amount || 699,
+        status: 'pending',
+        requestDate: formatDate(new Date()),
+        upiTxnId: 'Direct Pay (Mock)',
+        notes: `Plan: ${requestedPlan}, Gyms: ${requestedGyms}`,
+        paymentMethod: paymentMethod || 'UPI'
+      };
+
+      const savedReqs = localStorage.getItem('mock_billing_requests');
+      let reqsList = savedReqs ? JSON.parse(savedReqs) : [];
+      reqsList.unshift(newRequest);
+      localStorage.setItem('mock_billing_requests', JSON.stringify(reqsList));
+      setBillingRequests(reqsList);
+      return true;
     }
     return false;
   };
 
   const approveBillingRequest = async (requestId) => {
-    // The self-serve checkout automatically approves, so this is handled by database update status or recordPayment.
-    // If called manually on creator dashboard:
-    const reqItem = billingRequests.find(r => r.id === requestId || r._id === requestId);
-    if (!reqItem) return false;
-    
-    // Approve it by setting owner status active and adding payment
-    return await markGymOwnerPaid(reqItem.ownerId);
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return false;
+    try {
+      const response = await fetch(`http://localhost:5001/api/creator/requests/${requestId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'approved' })
+      });
+      if (response.ok) {
+        const data = await response.json(); // returns { request }
+        
+        setBillingRequests(prev => prev.map(r => (r.id === requestId || r._id === requestId) ? { ...data.request, id: data.request._id } : r));
+        
+        const clientsResp = await fetch('http://localhost:5001/api/creator/clients', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (clientsResp.ok) {
+          const clientsData = await clientsResp.json();
+          setGymOwners(clientsData.map(c => ({ ...c, id: c._id || c.id })));
+        }
+        return true;
+      }
+    } catch (err) {
+      console.warn('Approve billing request API error, falling back to mock:', err);
+      
+      const savedReqs = localStorage.getItem('mock_billing_requests');
+      let reqsList = savedReqs ? JSON.parse(savedReqs) : [];
+      const reqIndex = reqsList.findIndex(r => r.id === requestId || r._id === requestId);
+      if (reqIndex !== -1) {
+        reqsList[reqIndex].status = 'approved';
+        localStorage.setItem('mock_billing_requests', JSON.stringify(reqsList));
+        setBillingRequests(reqsList);
+
+        const targetReq = reqsList[reqIndex];
+        const savedOwners = localStorage.getItem('mock_gym_owners');
+        let ownersList = savedOwners ? JSON.parse(savedOwners) : [];
+        const ownerIndex = ownersList.findIndex(o => o.id === targetReq.ownerId);
+        if (ownerIndex !== -1) {
+          const owner = ownersList[ownerIndex];
+          owner.subscriptionStatus = 'active';
+          
+          const todayStr = formatDate(new Date());
+          const isExpired = owner.subscriptionStatus === 'overdue' || 
+                            owner.subscriptionStatus === 'revoked' || 
+                            owner.subscriptionStatus === 'unpaid' ||
+                            !owner.subscriptionDueDate ||
+                            new Date(owner.subscriptionDueDate) < new Date(todayStr);
+                            
+          const baseDate = isExpired ? todayStr : owner.subscriptionDueDate;
+          const newDueDate = addDays(baseDate, 30);
+          
+          owner.subscriptionDueDate = newDueDate;
+          owner.totalPaidToCreator = (owner.totalPaidToCreator || 0) + targetReq.amount;
+          owner.billingPayments.push({
+            amount: targetReq.amount,
+            paymentDate: todayStr,
+            paymentMethod: 'UPI',
+            notes: targetReq.notes || 'Mock payment approved'
+          });
+
+          const notesText = targetReq.notes || '';
+          if (notesText.includes('Plan: growth')) {
+            owner.pricingPlan = 'growth';
+          }
+          if (notesText.includes('Gyms: 2')) {
+            owner.allowedGyms = 2;
+          }
+
+          localStorage.setItem('mock_gym_owners', JSON.stringify(ownersList));
+          setGymOwners(ownersList);
+          
+          if (user && user.id === targetReq.ownerId) {
+            setUser(prev => {
+              const updated = {
+                ...prev,
+                subscriptionStatus: 'active',
+                subscriptionDueDate: newDueDate,
+                totalPaidToCreator: owner.totalPaidToCreator,
+                billingPayments: owner.billingPayments,
+                pricingPlan: owner.pricingPlan,
+                allowedGyms: owner.allowedGyms
+              };
+              localStorage.setItem('owner_user', JSON.stringify(updated));
+              return updated;
+            });
+          }
+        }
+      }
+      return true;
+    }
+    return false;
   };
 
   const rejectBillingRequest = async (requestId) => {
-    // Standard mock rejection simply updates local status. We can keep it client-side or ignore since checkout auto-approves.
-    setBillingRequests(prev => prev.map(req => {
-      if (req.id === requestId || req._id === requestId) {
-        return { ...req, status: 'rejected' };
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return false;
+    try {
+      const response = await fetch(`http://localhost:5001/api/creator/requests/${requestId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'rejected' })
+      });
+      if (response.ok) {
+        const data = await response.json(); // returns { request }
+        setBillingRequests(prev => prev.map(r => (r.id === requestId || r._id === requestId) ? { ...data.request, id: data.request._id } : r));
+        return true;
       }
-      return req;
-    }));
+    } catch (err) {
+      console.warn('Reject billing request API error, falling back to mock:', err);
+      
+      const savedReqs = localStorage.getItem('mock_billing_requests');
+      let reqsList = savedReqs ? JSON.parse(savedReqs) : [];
+      const reqIndex = reqsList.findIndex(r => r.id === requestId || r._id === requestId);
+      if (reqIndex !== -1) {
+        reqsList[reqIndex].status = 'rejected';
+        localStorage.setItem('mock_billing_requests', JSON.stringify(reqsList));
+        setBillingRequests(reqsList);
+      }
+      return true;
+    }
+    return false;
   };
 
   return {

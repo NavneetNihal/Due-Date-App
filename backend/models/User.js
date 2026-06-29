@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema({
   },
   subscriptionStatus: {
     type: String,
-    enum: ['active', 'overdue', 'revoked'],
+    enum: ['active', 'overdue', 'revoked', 'unpaid'],
     default: 'active'
   },
   pricingPlan: {

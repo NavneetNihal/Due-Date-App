@@ -4,6 +4,7 @@ import { AppContext, formatDate } from '../context/AppContext.jsx';
 import MembersTable from '../components/MembersTable.jsx';
 import AddMemberModal from '../components/AddMemberModal.jsx';
 import OwnerPayModal from '../components/OwnerPayModal.jsx';
+import { usePaymentStore } from '../store/paymentStore.js';
 import { 
   Users, 
   CheckCircle, 
@@ -23,7 +24,8 @@ import {
   Check,
   RotateCcw,
   Trash2,
-  Lock
+  Lock,
+  Clock
 } from 'lucide-react';
 
 function OwnerDashboard() {
@@ -43,7 +45,7 @@ function OwnerDashboard() {
     deleteGymOwner,
     addGymOwner,
     updateOwnerSubscription,
-    startFreeTrial
+    billingRequests
   } = useContext(AppContext);
   const navigate = useNavigate();
 
@@ -78,6 +80,20 @@ function OwnerDashboard() {
   });
 
   const today = formatDate(new Date());
+  
+  const { paymentStatus, syncPaymentStatus } = usePaymentStore();
+
+  useEffect(() => {
+    syncPaymentStatus(user, billingRequests);
+  }, [user, billingRequests, syncPaymentStatus]);
+
+  const pendingRequestObj = billingRequests?.find(r => 
+    (r.ownerId === user?.id || r.ownerId === user?._id || r.ownerName === user?.name) && 
+    r.status === 'pending'
+  );
+
+  const hasPaid = paymentStatus === 'paid';
+  const pendingRequest = paymentStatus === 'pending';
 
   // Filter outlets owned by this gym owner
   const ownerOutlets = gymOwners.filter(o => 
@@ -185,33 +201,6 @@ function OwnerDashboard() {
       setIsSettingsOpen(false);
     }, 1500);
   };
-
-  // Revoked Access Locked Screen (Clean Black Takeover)
-  if (user && user.subscriptionStatus === 'revoked') {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-[#000000] text-slate-100 selection:bg-brand-primary selection:text-white z-[9999] relative">
-        <div className="max-w-md w-full text-center space-y-6">
-          <div className="mx-auto w-16 h-16 bg-red-950/30 border border-red-900/50 rounded-full flex items-center justify-center text-red-500 mb-6 animate-pulse">
-            <Lock className="h-8 w-8" />
-          </div>
-          
-          <h2 className="text-2xl font-black tracking-tight text-white uppercase font-sans">Access Suspended</h2>
-          <p className="text-xs text-slate-400 leading-relaxed font-sans px-4">
-            Your gym owner account access for <strong className="text-slate-200">{user.businessName}</strong> has been suspended due to pending subscription payment. Please contact the administrator to settle dues and reactivate your account.
-          </p>
-
-          <div className="pt-4 border-t border-slate-900">
-            <button
-              onClick={() => logout()}
-              className="w-full py-3 px-4 bg-slate-950 hover:bg-slate-900 border border-slate-900 text-slate-400 hover:text-slate-200 font-bold rounded-xl text-xs transition duration-150 cursor-pointer shadow-md"
-            >
-              Log Out of Account
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen pb-12">
@@ -358,6 +347,48 @@ function OwnerDashboard() {
       {/* Main Grid Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
         
+        {/* Unpaid Account / Warning Alert Banners */}
+        {!hasPaid && (
+          pendingRequest ? (
+            <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-in fade-in duration-200">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-amber-500/15 border border-amber-500/20 rounded-xl flex items-center justify-center text-amber-400 flex-shrink-0 animate-pulse">
+                  🕒
+                </div>
+                <div className="space-y-0.5 text-left">
+                  <h4 className="text-xs font-black text-slate-100 uppercase tracking-widest">Payment Request Pending Verification</h4>
+                  <p className="text-[10px] text-slate-400 leading-normal">
+                    You submitted a payment log (₹699) on <strong className="text-amber-400">{pendingRequestObj?.requestDate || today}</strong>. Once confirmed by the administrator, member registration will unlock.
+                  </p>
+                </div>
+              </div>
+              <div className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-1.5 self-start sm:self-center">
+                Confirmation Pending
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 bg-purple-500/10 border border-purple-500/25 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-in fade-in duration-200">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-purple-500/15 border border-purple-500/20 rounded-xl flex items-center justify-center text-purple-400 flex-shrink-0">
+                  🔑
+                </div>
+                <div className="space-y-0.5 text-left">
+                  <h4 className="text-xs font-black text-slate-100 uppercase tracking-widest">License Activation Required</h4>
+                  <p className="text-[10px] text-slate-400 leading-normal">
+                    You are in preview mode. To start registering new gym members and sending alerts, please activate your monthly platform license.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsPayModalOpen(true)}
+                className="py-1.5 px-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-[10px] transition cursor-pointer self-start sm:self-center shadow-lg shadow-purple-950/20"
+              >
+                Pay ₹699 & Unlock Account
+              </button>
+            </div>
+          )
+        )}
+
         {/* Banner */}
         <div className="backdrop-blur-md bg-gradient-to-r from-brand-primary/10 via-slate-900/20 to-brand-accent/5 border border-slate-800/80 p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -366,25 +397,36 @@ function OwnerDashboard() {
           </div>
           <button 
             onClick={() => {
-              const isLicenseUnlocked = user?.subscriptionStatus !== 'revoked';
-              if (isLicenseUnlocked) {
+              if (user?.subscriptionStatus === 'revoked') {
+                return; // Suspend block
+              }
+              if (hasPaid) {
                 setIsAddModalOpen(true);
-              } else {
+              } else if (!pendingRequest) {
                 setIsPayModalOpen(true);
               }
             }}
-            className={`flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-xl shadow-lg active:scale-95 transition cursor-pointer ${
-              (user?.subscriptionStatus !== 'revoked')
-                ? 'bg-brand-primary hover:bg-brand-primary-hover text-white shadow-brand-primary/10'
-                : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:bg-slate-750'
+            className={`flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-xl shadow-lg active:scale-95 transition ${
+              hasPaid
+                ? 'bg-brand-primary hover:bg-brand-primary-hover text-white shadow-brand-primary/10 cursor-pointer'
+                : pendingRequest
+                ? 'bg-slate-900 border border-amber-500/20 text-amber-400 cursor-not-allowed shadow-none'
+                : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:bg-slate-750 cursor-pointer'
             }`}
+            disabled={!hasPaid && !!pendingRequest}
           >
-            {(user?.subscriptionStatus !== 'revoked') ? (
+            {hasPaid ? (
               <Plus className="h-4 w-4" />
+            ) : pendingRequest ? (
+              <Clock className="h-4 w-4 text-amber-400 animate-pulse" />
             ) : (
               <Lock className="h-4 w-4 text-amber-500 animate-pulse" />
             )}
-            {(user?.subscriptionStatus !== 'revoked') ? 'Add Member' : 'Unlock Add Member (Pay Due)'}
+            {hasPaid 
+              ? 'Add Member' 
+              : pendingRequest 
+              ? 'Awaiting Creator Approval' 
+              : 'Unlock Add Member (Pay Due)'}
           </button>
         </div>
 
@@ -1139,6 +1181,32 @@ function OwnerDashboard() {
                 className="flex-1 py-2 bg-red-650 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition cursor-pointer"
               >
                 Yes, Delete Outlet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Revoked Access Semi-Transparent Overlay Lockout */}
+      {user && user.subscriptionStatus === 'revoked' && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-[9999] flex items-center justify-center p-4">
+          <div className="bg-slate-900/95 border border-red-500/25 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full p-6 text-center space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="mx-auto w-12 h-12 bg-red-950/40 border border-red-900/30 rounded-xl flex items-center justify-center text-red-500">
+              <Lock className="h-6 w-6 animate-pulse" />
+            </div>
+            
+            <div className="space-y-2">
+              <h2 className="text-lg font-black tracking-tight text-white uppercase font-sans">Access Suspended</h2>
+              <p className="text-xs text-slate-400 leading-relaxed font-sans px-4">
+                Your gym owner account access for <strong className="text-slate-200">{user.businessName}</strong> has been suspended by the administrator. Please pay your monthly SaaS license fee or contact the creator to settle dues and reactivate your dashboard access.
+              </p>
+            </div>
+
+            <div className="pt-4 border-t border-slate-800">
+              <button
+                onClick={() => logout()}
+                className="w-full py-2.5 px-4 bg-slate-950 hover:bg-slate-900 border border-slate-850 text-slate-400 hover:text-slate-200 font-bold rounded-xl text-xs transition duration-150 cursor-pointer shadow-md"
+              >
+                Log Out of Account
               </button>
             </div>
           </div>

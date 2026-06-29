@@ -15,7 +15,7 @@ function MembersTable({ members, payments = [], onMarkPaid, onDelete, onReverseP
     
     const text = template
       .replace(/{name}/g, member.name)
-      .replace(/{amount}/g, member.subscriptionAmount)
+      .replace(/{amount}/g, member.subscriptionAmount || member.amount || 0)
       .replace(/{due_date}/g, member.nextDueDate)
       .replace(/{upi_id}/g, upiId)
       .replace(/{payment_link}/g, paymentLink);
@@ -205,7 +205,7 @@ function MembersTable({ members, payments = [], onMarkPaid, onDelete, onReverseP
                       {member.subscriptionTier}
                     </span>
                     <span className="text-xs text-slate-500">
-                      ₹{member.subscriptionAmount.toLocaleString('en-IN')}
+                      ₹{(member.subscriptionAmount || member.amount || 0).toLocaleString('en-IN')}
                     </span>
                   </td>
 
@@ -338,7 +338,7 @@ function MembersTable({ members, payments = [], onMarkPaid, onDelete, onReverseP
                 <div>
                   <span className="text-slate-500 block mb-0.5">Subscription</span>
                   <span className="text-slate-200 capitalize font-medium">
-                    {member.subscriptionTier} (₹{member.subscriptionAmount})
+                    {member.subscriptionTier} (₹{member.subscriptionAmount || member.amount || 0})
                   </span>
                 </div>
 
