@@ -13,27 +13,20 @@ import {
   Upload, 
   Check, 
   AlertCircle,
-  MessageSquare,
   Shield
 } from 'lucide-react';
 
 function Profile() {
   const { 
     user, 
-    members: allMembers, 
     payments, 
     updateProfile, 
     updateOwnerSubscription, 
-    simulate200Members,
     developerSettings,
-    gymOwners,
     billingRequests,
     activeOutletId
   } = useContext(AppContext);
   const navigate = useNavigate();
-
-  // Filter members to only those belonging to the active outlet
-  const members = allMembers.filter(m => (m.gymId || 'owner_golds') === (activeOutletId || 'owner_golds'));
 
   // Redirect creator to dashboard since profile settings are for Gym Owners
   useEffect(() => {
@@ -86,7 +79,6 @@ function Profile() {
 
   // Calculate total earnings from ledger
   const totalCollected = outletPayments.reduce((sum, p) => sum + p.amountPaid, 0);
-  const membersCount = members.length;
 
   // Handle QR Code Image Upload (Base64)
   const handleImageChange = (e) => {

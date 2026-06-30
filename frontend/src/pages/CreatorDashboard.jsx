@@ -134,7 +134,6 @@ function CreatorDashboard() {
   const totalOwners = gymOwners?.length || 0;
   const activeOwners = gymOwners?.filter(o => o.subscriptionStatus === 'active')?.length || 0;
   const totalARR = gymOwners?.reduce((sum, o) => sum + o.totalPaidToCreator, 0) || 0;
-  const growthOwnersCount = gymOwners?.filter(o => o.pricingPlan === 'growth')?.length || 0;
 
   const filteredOwners = gymOwners?.filter(owner => 
     owner.businessName.toLowerCase().includes(creatorSearchQuery.toLowerCase()) ||

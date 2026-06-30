@@ -1,4 +1,5 @@
 import { formatDate, addDays } from './dateHelpers.js';
+import api from '../api.js';
 
 export const useOwnerActions = (
   user,
@@ -11,27 +12,16 @@ export const useOwnerActions = (
   setActiveOutletId
 ) => {
   const updateGymOwnerStatus = async (ownerId, newStatus, newPlan, newAllowedGyms) => {
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return false;
     try {
-      const response = await fetch(`http://localhost:5001/api/creator/clients/${ownerId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          status: newStatus,
-          pricingPlan: newPlan,
-          allowedGyms: newAllowedGyms
-        })
+      const response = await api.put(`/creator/clients/${ownerId}/status`, {
+        status: newStatus,
+        pricingPlan: newPlan,
+        allowedGyms: newAllowedGyms
       });
 
-      if (response.ok) {
-        const data = await response.json(); // returns { client }
-        setGymOwners(prev => prev.map(o => o.id === ownerId ? data.client : o));
-        return true;
-      }
+      const data = response.data; // returns { client }
+      setGymOwners(prev => prev.map(o => o.id === ownerId ? data.client : o));
+      return true;
     } catch (err) {
       console.warn('Update client status API error, falling back to mock:', err);
       
@@ -57,13 +47,9 @@ export const useOwnerActions = (
       setGymOwners(ownersList);
       return true;
     }
-    return false;
   };
 
   const markGymOwnerPaid = async (ownerId) => {
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return false;
-    
     // Find the owner to calculate next subscription due date
     const owner = gymOwners.find(o => o.id === ownerId);
     if (!owner) return false;
@@ -79,33 +65,19 @@ export const useOwnerActions = (
     const newDueDate = addDays(baseDate, 30);
 
     try {
-      const response = await fetch(`http://localhost:5001/api/creator/clients/${ownerId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          status: 'active',
-          subscriptionDueDate: newDueDate,
-          recordPayment: true
-        })
+      const response = await api.put(`/creator/clients/${ownerId}/status`, {
+        status: 'active',
+        subscriptionDueDate: newDueDate,
+        recordPayment: true
       });
 
-      if (response.ok) {
-        const data = await response.json(); // returns { client }
-        setGymOwners(prev => prev.map(o => o.id === ownerId ? data.client : o));
-        
-        // Refresh billing requests list (creator ledger)
-        const ledgerResp = await fetch('http://localhost:5001/api/creator/ledger', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (ledgerResp.ok) {
-          const ledgerData = await ledgerResp.json();
-          setBillingRequests(ledgerData.logs);
-        }
-        return true;
-      }
+      const data = response.data; // returns { client }
+      setGymOwners(prev => prev.map(o => o.id === ownerId ? data.client : o));
+      
+      // Refresh billing requests list (creator ledger)
+      const ledgerResp = await api.get('/creator/ledger');
+      setBillingRequests(ledgerResp.data.logs);
+      return true;
     } catch (err) {
       console.warn('Mark gym owner paid API error, falling back to mock:', err);
       
@@ -160,34 +132,19 @@ export const useOwnerActions = (
       setBillingRequests(reqsList);
       return true;
     }
-    return false;
   };
 
   const reverseGymOwnerPayment = async (ownerId) => {
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return false;
     try {
-      const response = await fetch(`http://localhost:5001/api/creator/clients/${ownerId}/reverse`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await api.post(`/creator/clients/${ownerId}/reverse`);
 
-      if (response.ok) {
-        const data = await response.json(); // returns { client }
-        setGymOwners(prev => prev.map(o => o.id === ownerId ? data.client : o));
-        
-        // Refresh billing requests list
-        const ledgerResp = await fetch('http://localhost:5001/api/creator/ledger', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (ledgerResp.ok) {
-          const ledgerData = await ledgerResp.json();
-          setBillingRequests(ledgerData.logs);
-        }
-        return true;
-      }
+      const data = response.data; // returns { client }
+      setGymOwners(prev => prev.map(o => o.id === ownerId ? data.client : o));
+      
+      // Refresh billing requests list
+      const ledgerResp = await api.get('/creator/ledger');
+      setBillingRequests(ledgerResp.data.logs);
+      return true;
     } catch (err) {
       console.warn('Reverse gym owner payment API error, falling back to mock:', err);
       
@@ -223,23 +180,13 @@ export const useOwnerActions = (
       setGymOwners(ownersList);
       return true;
     }
-    return false;
   };
 
   const deleteGymOwner = async (ownerId) => {
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return false;
     try {
-      const response = await fetch(`http://localhost:5001/api/creator/clients/${ownerId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (response.ok) {
-        setGymOwners(prev => prev.filter(o => o.id !== ownerId));
-        return true;
-      }
+      await api.delete(`/creator/clients/${ownerId}`);
+      setGymOwners(prev => prev.filter(o => o.id !== ownerId));
+      return true;
     } catch (err) {
       console.warn('Delete client API error, falling back to mock:', err);
       
@@ -250,39 +197,29 @@ export const useOwnerActions = (
       setGymOwners(ownersList);
       return true;
     }
-    return false;
   };
 
   const addGymOwner = async (ownerData) => {
-    const token = localStorage.getItem('jwt_token');
     try {
-      const response = await fetch('http://localhost:5001/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: ownerData.ownerName || 'Gym Owner',
-          email: ownerData.email || `gym_${Date.now()}@test.com`,
-          password: 'password123',
-          businessName: ownerData.businessName,
-          phone: ownerData.phone1
-        })
+      const response = await api.post('/auth/register', {
+        name: ownerData.ownerName || 'Gym Owner',
+        email: ownerData.email || `gym_${Date.now()}@test.com`,
+        password: 'password123',
+        businessName: ownerData.businessName,
+        phone: ownerData.phone1
       });
 
-      if (response.ok) {
-        const data = await response.json(); // returns { token, user }
-        const newOwnerEnriched = {
-          ...data.user,
-          registeredMembersCount: 0
-        };
-        setGymOwners(prev => [newOwnerEnriched, ...prev]);
+      const data = response.data; // returns { token, user }
+      const newOwnerEnriched = {
+        ...data.user,
+        registeredMembersCount: 0
+      };
+      setGymOwners(prev => [newOwnerEnriched, ...prev]);
 
-        if (user && user.role === 'owner') {
-          setActiveOutletId(data.user.id);
-        }
-        return true;
+      if (user && user.role === 'owner') {
+        setActiveOutletId(data.user.id);
       }
+      return true;
     } catch (err) {
       console.warn('Add gym owner API error, falling back to mock:', err);
       
@@ -313,44 +250,32 @@ export const useOwnerActions = (
       }
       return true;
     }
-    return false;
   };
 
   const submitBillingRequest = async (ownerId, requestedPlan, requestedGyms, amount, paymentMethod) => {
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return false;
     try {
-      const response = await fetch('http://localhost:5001/api/creator/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          upiTxnId: 'Direct Pay',
-          notes: `Plan: ${requestedPlan}, Gyms: ${requestedGyms}`
-        })
+      const response = await api.post('/creator/checkout', {
+        upiTxnId: 'Direct Pay',
+        notes: `Plan: ${requestedPlan}, Gyms: ${requestedGyms}`
       });
 
-      if (response.ok) {
-        const data = await response.json(); // returns { user, billingRequest }
-        
-        setUser(prev => {
-          if (!prev) return null;
-          const updated = {
-            ...prev,
-            subscriptionStatus: data.user.subscriptionStatus,
-            subscriptionDueDate: data.user.subscriptionDueDate,
-            totalPaidToCreator: data.user.totalPaidToCreator,
-            billingPayments: data.user.billingPayments
-          };
-          localStorage.setItem('owner_user', JSON.stringify(updated));
-          return updated;
-        });
+      const data = response.data; // returns { user, billingRequest }
+      
+      setUser(prev => {
+        if (!prev) return null;
+        const updated = {
+          ...prev,
+          subscriptionStatus: data.user.subscriptionStatus,
+          subscriptionDueDate: data.user.subscriptionDueDate,
+          totalPaidToCreator: data.user.totalPaidToCreator,
+          billingPayments: data.user.billingPayments
+        };
+        localStorage.setItem('owner_user', JSON.stringify(updated));
+        return updated;
+      });
 
-        setBillingRequests(prev => [data.billingRequest, ...prev]);
-        return true;
-      }
+      setBillingRequests(prev => [data.billingRequest, ...prev]);
+      return true;
     } catch (err) {
       console.warn('Submit billing request API error, falling back to mock:', err);
       
@@ -373,37 +298,19 @@ export const useOwnerActions = (
       reqsList.unshift(newRequest);
       localStorage.setItem('mock_billing_requests', JSON.stringify(reqsList));
       setBillingRequests(reqsList);
-      return true;
     }
-    return false;
   };
 
   const approveBillingRequest = async (requestId) => {
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return false;
     try {
-      const response = await fetch(`http://localhost:5001/api/creator/requests/${requestId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: 'approved' })
-      });
-      if (response.ok) {
-        const data = await response.json(); // returns { request }
-        
-        setBillingRequests(prev => prev.map(r => (r.id === requestId || r._id === requestId) ? { ...data.request, id: data.request._id } : r));
-        
-        const clientsResp = await fetch('http://localhost:5001/api/creator/clients', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (clientsResp.ok) {
-          const clientsData = await clientsResp.json();
-          setGymOwners(clientsData.map(c => ({ ...c, id: c._id || c.id })));
-        }
-        return true;
-      }
+      const response = await api.put(`/creator/requests/${requestId}`, { status: 'approved' });
+      const data = response.data; // returns { request }
+      
+      setBillingRequests(prev => prev.map(r => (r.id === requestId || r._id === requestId) ? { ...data.request, id: data.request._id } : r));
+      
+      const clientsResp = await api.get('/creator/clients');
+      setGymOwners(clientsResp.data.map(c => ({ ...c, id: c._id || c.id })));
+      return true;
     } catch (err) {
       console.warn('Approve billing request API error, falling back to mock:', err);
       
@@ -472,26 +379,14 @@ export const useOwnerActions = (
       }
       return true;
     }
-    return false;
   };
 
   const rejectBillingRequest = async (requestId) => {
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return false;
     try {
-      const response = await fetch(`http://localhost:5001/api/creator/requests/${requestId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: 'rejected' })
-      });
-      if (response.ok) {
-        const data = await response.json(); // returns { request }
-        setBillingRequests(prev => prev.map(r => (r.id === requestId || r._id === requestId) ? { ...data.request, id: data.request._id } : r));
-        return true;
-      }
+      const response = await api.put(`/creator/requests/${requestId}`, { status: 'rejected' });
+      const data = response.data; // returns { request }
+      setBillingRequests(prev => prev.map(r => (r.id === requestId || r._id === requestId) ? { ...data.request, id: data.request._id } : r));
+      return true;
     } catch (err) {
       console.warn('Reject billing request API error, falling back to mock:', err);
       
@@ -505,7 +400,6 @@ export const useOwnerActions = (
       }
       return true;
     }
-    return false;
   };
 
   return {

@@ -1,22 +1,15 @@
-import { formatDate, addDays } from './dateHelpers.js';
+import { formatDate } from './dateHelpers.js';
+import api from '../api.js';
 
-export const useAuthActions = (user, setUser, gymOwners, setGymOwners) => {
+export const useAuthActions = (user, setUser, _gymOwners, _setGymOwners) => {
   const login = async (email, password) => {
     try {
-      const response = await fetch('http://localhost:5001/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-        localStorage.setItem('owner_user', JSON.stringify(data.user));
-        localStorage.setItem('jwt_token', data.token);
-        return true;
-      }
-      return false;
+      const response = await api.post('/auth/login', { email, password });
+      const data = response.data;
+      setUser(data.user);
+      localStorage.setItem('owner_user', JSON.stringify(data.user));
+      localStorage.setItem('jwt_token', data.token);
+      return true;
     } catch (error) {
       console.warn('Login API error, falling back to mock login (offline mode):', error);
       
@@ -84,29 +77,19 @@ export const useAuthActions = (user, setUser, gymOwners, setGymOwners) => {
 
   const register = async (username, email, password) => {
     try {
-      const response = await fetch('http://localhost:5001/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: username || "New Gym Owner",
-          email,
-          password,
-          businessName: username ? `${username}'s Gym` : "My Gym",
-          phone: '9999988888'
-        })
+      const response = await api.post('/auth/register', {
+        name: username || "New Gym Owner",
+        email,
+        password,
+        businessName: username ? `${username}'s Gym` : "My Gym",
+        phone: '9999988888'
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-        localStorage.setItem('owner_user', JSON.stringify(data.user));
-        localStorage.setItem('jwt_token', data.token);
-        return true;
-      }
-      
-      // Fallback: If registration fails (e.g. duplicate email), automatically attempt login
-      console.warn('Registration failed, executing automatic login fallback...');
-      return await login(email, password);
+ 
+      const data = response.data;
+      setUser(data.user);
+      localStorage.setItem('owner_user', JSON.stringify(data.user));
+      localStorage.setItem('jwt_token', data.token);
+      return true;
     } catch (error) {
       console.warn('Register API error, falling back to mock registration (offline mode):', error);
       
@@ -179,27 +162,16 @@ export const useAuthActions = (user, setUser, gymOwners, setGymOwners) => {
   };
 
   const updateSettings = async (newSettings) => {
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return false;
     try {
-      const response = await fetch('http://localhost:5001/api/auth/settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(newSettings)
+      const response = await api.put('/auth/settings', newSettings);
+      const data = response.data;
+      setUser(prev => {
+        if (!prev) return null;
+        const updated = { ...prev, settings: data.settings };
+        localStorage.setItem('owner_user', JSON.stringify(updated));
+        return updated;
       });
-      if (response.ok) {
-        const data = await response.json();
-        setUser(prev => {
-          if (!prev) return null;
-          const updated = { ...prev, settings: data.settings };
-          localStorage.setItem('owner_user', JSON.stringify(updated));
-          return updated;
-        });
-        return true;
-      }
+      return true;
     } catch (err) {
       console.error('Update settings API error:', err);
     }
@@ -207,45 +179,26 @@ export const useAuthActions = (user, setUser, gymOwners, setGymOwners) => {
   };
 
   const updateProfile = async (profileData) => {
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return false;
     try {
-      const response = await fetch('http://localhost:5001/api/auth/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(profileData)
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-        localStorage.setItem('owner_user', JSON.stringify(data.user));
-        return true;
-      }
+      const response = await api.put('/auth/profile', profileData);
+      const data = response.data;
+      setUser(data.user);
+      localStorage.setItem('owner_user', JSON.stringify(data.user));
+      return true;
     } catch (err) {
       console.error('Update profile API error:', err);
     }
     return false;
   };
 
-  const updateOwnerSubscription = async (status, dueDate, graceDaysRemaining) => {
+  const updateOwnerSubscription = async (_status, _dueDate, _graceDaysRemaining) => {
     // Single source of truth is fetched from /api/auth/profile during app mount/refresh.
     // If called manually, fetch the fresh profile.
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return;
     try {
-      const response = await fetch('http://localhost:5001/api/auth/profile', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data);
-        localStorage.setItem('owner_user', JSON.stringify(data));
-      }
+      const response = await api.get('/auth/profile');
+      const data = response.data;
+      setUser(data);
+      localStorage.setItem('owner_user', JSON.stringify(data));
     } catch (err) {
       console.error('Update owner subscription API error:', err);
     }
@@ -253,32 +206,21 @@ export const useAuthActions = (user, setUser, gymOwners, setGymOwners) => {
 
   const payOwnerSubscription = async (amount, paymentMethod) => {
     // This is handled by checkout endpoint on backend
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return false;
     try {
-      const response = await fetch('http://localhost:5001/api/creator/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          notes: `Paid ₹${amount} via ${paymentMethod}`
-        })
+      const response = await api.post('/creator/checkout', {
+        notes: `Paid ₹${amount} via ${paymentMethod}`
       });
-      if (response.ok) {
-        const data = await response.json();
-        setUser(prev => {
-          if (!prev) return null;
-          const updated = {
-            ...prev,
-            ...data.user
-          };
-          localStorage.setItem('owner_user', JSON.stringify(updated));
-          return updated;
-        });
-        return true;
-      }
+      const data = response.data;
+      setUser(prev => {
+        if (!prev) return null;
+        const updated = {
+          ...prev,
+          ...data.user
+        };
+        localStorage.setItem('owner_user', JSON.stringify(updated));
+        return updated;
+      });
+      return true;
     } catch (err) {
       console.error('payOwnerSubscription API error:', err);
     }

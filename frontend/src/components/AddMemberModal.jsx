@@ -3,7 +3,7 @@ import { X, User, Phone, Calendar, CreditCard, AlertCircle } from 'lucide-react'
 import { AppContext, formatDate, addDays } from '../context/AppContext.jsx';
 
 function AddMemberModal({ isOpen, onClose, onAdd }) {
-  const { user, members: allMembers, activeOutletId } = useContext(AppContext);
+  const { members: allMembers, activeOutletId } = useContext(AppContext);
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [subscriptionTier, setSubscriptionTier] = useState('monthly');
@@ -37,7 +37,6 @@ function AddMemberModal({ isOpen, onClose, onAdd }) {
 
   if (!isOpen) return null;
 
-  const isStarterPlan = false;
   const isGrowthPlan = false;
   const maxLimit = Infinity;
   const limitReached = false;

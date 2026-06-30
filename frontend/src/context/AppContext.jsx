@@ -4,6 +4,7 @@ import { useAuthActions } from './authActions.js';
 import { usePaymentActions } from './paymentActions.js';
 import { useMemberActions } from './memberActions.js';
 import { useOwnerActions } from './ownerActions.js';
+import api from '../api.js';
 
 export const AppContext = createContext();
 
@@ -27,11 +28,8 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     const fetchDevSettings = async () => {
       try {
-        const response = await fetch('http://localhost:5001/api/creator/settings');
-        if (response.ok) {
-          const settingsData = await response.json();
-          setDeveloperSettings(settingsData);
-        }
+        const response = await api.get('/creator/settings');
+        setDeveloperSettings(response.data);
       } catch (err) {
         console.error('Fetch developer settings error:', err);
       }
@@ -96,63 +94,32 @@ export const AppProvider = ({ children }) => {
       setLoading(true);
       try {
         // Fetch Profile
-        const profileResp = await fetch('http://localhost:5001/api/auth/profile', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (profileResp.ok) {
-          const userData = await profileResp.json();
-          const userWithId = { ...userData, id: userData.id || userData._id };
-          setUser(userWithId);
-          localStorage.setItem('owner_user', JSON.stringify(userWithId));
+        const profileResp = await api.get('/auth/profile');
+        const userData = profileResp.data;
+        const userWithId = { ...userData, id: userData.id || userData._id };
+        setUser(userWithId);
+        localStorage.setItem('owner_user', JSON.stringify(userWithId));
 
-          if (userData.role === 'creator') {
-            // Load platform clients (gyms list)
-            const clientsResp = await fetch('http://localhost:5001/api/creator/clients', {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (clientsResp.ok) {
-              const clientsData = await clientsResp.json();
-              setGymOwners(clientsData.map(c => ({ ...c, id: c._id || c.id })));
-            }
+        if (userData.role === 'creator') {
+          // Load platform clients (gyms list)
+          const clientsResp = await api.get('/creator/clients');
+          setGymOwners(clientsResp.data.map(c => ({ ...c, id: c._id || c.id })));
 
-            // Load billing receipts history
-            const ledgerResp = await fetch('http://localhost:5001/api/creator/ledger', {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (ledgerResp.ok) {
-              const ledgerData = await ledgerResp.json();
-              setBillingRequests(ledgerData.logs.map(r => ({ ...r, id: r._id || r.id })));
-            }
-          } else {
-            // Load members
-            const membersResp = await fetch(`http://localhost:5001/api/members?gymId=${activeOutletId}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (membersResp.ok) {
-              const membersData = await membersResp.json();
-              setMembers(membersData.map(m => ({ ...m, id: m._id || m.id })));
-            }
-
-            // Load accounting payments history
-            const paymentsResp = await fetch(`http://localhost:5001/api/payments?gymId=${activeOutletId}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (paymentsResp.ok) {
-              const paymentsData = await paymentsResp.json();
-              setPayments(paymentsData.map(p => ({ ...p, id: p._id || p.id })));
-            }
-
-            // Fetch owner's billing requests for persistence
-            const ledgerResp = await fetch('http://localhost:5001/api/creator/ledger', {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (ledgerResp.ok) {
-              const ledgerData = await ledgerResp.json();
-              setBillingRequests(ledgerData.logs.map(r => ({ ...r, id: r._id || r.id })));
-            }
-          }
+          // Load billing receipts history
+          const ledgerResp = await api.get('/creator/ledger');
+          setBillingRequests(ledgerResp.data.logs.map(r => ({ ...r, id: r._id || r.id })));
         } else {
-          loadMockLocalData();
+          // Load members
+          const membersResp = await api.get(`/members?gymId=${activeOutletId}`);
+          setMembers(membersResp.data.map(m => ({ ...m, id: m._id || m.id })));
+
+          // Load accounting payments history
+          const paymentsResp = await api.get(`/payments?gymId=${activeOutletId}`);
+          setPayments(paymentsResp.data.map(p => ({ ...p, id: p._id || p.id })));
+
+          // Fetch owner's billing requests for persistence
+          const ledgerResp = await api.get('/creator/ledger');
+          setBillingRequests(ledgerResp.data.logs.map(r => ({ ...r, id: r._id || r.id })));
         }
       } catch (err) {
         console.warn('Initial async data fetch error, loading from localStorage fallback:', err);
@@ -197,26 +164,14 @@ export const AppProvider = ({ children }) => {
   // Initialize modular hook actions
   const authActions = useAuthActions(user, setUser, gymOwners, setGymOwners);
   const paymentActions = usePaymentActions(members, setMembers, payments, setPayments, activeOutletId, setUser);
-  const memberActions = useMemberActions(members, setMembers, activeOutletId, setPayments, setUser, paymentActions.addPaymentRecord);
+  const memberActions = useMemberActions(members, setMembers, activeOutletId, setPayments);
   const ownerActions = useOwnerActions(user, setUser, gymOwners, setGymOwners, billingRequests, setBillingRequests, activeOutletId, setActiveOutletId);
 
   const updateDeveloperSettings = async (newDevSettings) => {
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return false;
     try {
-      const response = await fetch('http://localhost:5001/api/creator/settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(newDevSettings)
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setDeveloperSettings(data.settings);
-        return true;
-      }
+      const response = await api.put('/creator/settings', newDevSettings);
+      setDeveloperSettings(response.data.settings);
+      return true;
     } catch (err) {
       console.error('Update developer settings error:', err);
     }

@@ -17,14 +17,11 @@ import {
   Settings, 
   LogOut, 
   Dumbbell,
-  MessageSquare,
-  Link as LinkIcon,
   X,
   History,
   User,
   Building,
   Check,
-  RotateCcw,
   Trash2,
   Lock,
   Clock
@@ -46,7 +43,6 @@ function OwnerDashboard() {
     setActiveOutletId,
     deleteGymOwner,
     addGymOwner,
-    updateOwnerSubscription,
     billingRequests
   } = useContext(AppContext);
   const navigate = useNavigate();
@@ -94,7 +90,6 @@ function OwnerDashboard() {
     o.id === user?.id
   );
 
-  const gymLimitReached = false;
 
   const activeOutlet = ownerOutlets.find(o => o.id === activeOutletId) || ownerOutlets[0] || {
     id: 'owner_golds',

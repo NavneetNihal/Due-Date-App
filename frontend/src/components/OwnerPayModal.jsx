@@ -1,10 +1,10 @@
 import React, { useContext, useState } from 'react';
 import { AppContext } from '../context/AppContext.jsx';
-import { X, Check, CreditCard, IndianRupee, QrCode } from 'lucide-react';
+import { X, Check, IndianRupee } from 'lucide-react';
 
 function OwnerPayModal({ isOpen, onClose, amount, requestedPlan, requestedGyms }) {
   const { submitBillingRequest, developerSettings, user } = useContext(AppContext);
-  const [paymentMethod, setPaymentMethod] = useState('UPI'); // UPI, Card
+  const paymentMethod = 'UPI'; // UPI, Card
   const [simulating, setSimulating] = useState(false);
   const [success, setSuccess] = useState(false);
 

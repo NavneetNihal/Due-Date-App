@@ -1,43 +1,28 @@
+import api from '../api.js';
+
 export const usePaymentActions = (members, setMembers, payments, setPayments, activeOutletId, setUser) => {
   const addPaymentRecord = (newPayment) => {
     setPayments(prev => [newPayment, ...prev]);
   };
 
   const markAsPaid = async (memberId, method = 'UPI', notes = 'Subscription renewal') => {
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return false;
     try {
-      const response = await fetch('http://localhost:5001/api/payments/pay', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          memberId,
-          paymentMethod: method,
-          notes
-        })
+      const response = await api.post('/payments/pay', {
+        memberId,
+        paymentMethod: method,
+        notes
       });
-
-      if (response.ok) {
-        const data = await response.json(); // returns { member, payment }
-        
-        setMembers(prev => prev.map(m => m._id === memberId ? data.member : m));
-        addPaymentRecord(data.payment);
-
-        const profileResponse = await fetch('http://localhost:5001/api/auth/profile', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (profileResponse.ok) {
-          const profileData = await profileResponse.json();
-          setUser(profileData);
-          localStorage.setItem('owner_user', JSON.stringify(profileData));
-        }
-        return true;
-      }
+ 
+      const data = response.data; // returns { member, payment }
+      
+      setMembers(prev => prev.map(m => m._id === memberId ? data.member : m));
+      addPaymentRecord(data.payment);
+ 
+      const profileResponse = await api.get('/auth/profile');
+      const profileData = profileResponse.data;
+      setUser(profileData);
+      localStorage.setItem('owner_user', JSON.stringify(profileData));
+      return true;
     } catch (error) {
       console.warn('Mark paid API error, falling back to mock:', error);
       
@@ -100,40 +85,22 @@ export const usePaymentActions = (members, setMembers, payments, setPayments, ac
   };
 
   const reversePayment = async (paymentId) => {
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return false;
     try {
-      const response = await fetch('http://localhost:5001/api/payments/reverse', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ paymentId })
-      });
-
-      if (response.ok) {
-        const data = await response.json(); // returns { member, payment }
-        
-        setMembers(prev => prev.map(m => m._id === data.member._id ? data.member : m));
-        
-        setPayments(prev => 
-          prev.map(p => p._id === paymentId ? { ...p, isReversal: true } : p)
-              .concat(data.payment)
-        );
-
-        const profileResponse = await fetch('http://localhost:5001/api/auth/profile', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (profileResponse.ok) {
-          const profileData = await profileResponse.json();
-          setUser(profileData);
-          localStorage.setItem('owner_user', JSON.stringify(profileData));
-        }
-        return true;
-      }
+      const response = await api.post('/payments/reverse', { paymentId });
+      const data = response.data; // returns { member, payment }
+      
+      setMembers(prev => prev.map(m => m._id === data.member._id ? data.member : m));
+      
+      setPayments(prev => 
+        prev.map(p => p._id === paymentId ? { ...p, isReversal: true } : p)
+            .concat(data.payment)
+      );
+ 
+      const profileResponse = await api.get('/auth/profile');
+      const profileData = profileResponse.data;
+      setUser(profileData);
+      localStorage.setItem('owner_user', JSON.stringify(profileData));
+      return true;
     } catch (error) {
       console.warn('Reverse payment API error, falling back to mock:', error);
       
