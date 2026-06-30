@@ -350,9 +350,7 @@ export const useOwnerActions = (
           });
 
           const notesText = targetReq.notes || '';
-          if (notesText.includes('Plan: growth')) {
-            owner.pricingPlan = 'growth';
-          }
+          owner.pricingPlan = 'basic';
           if (notesText.includes('Gyms: 2')) {
             owner.allowedGyms = 2;
           }

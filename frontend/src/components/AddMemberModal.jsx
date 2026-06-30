@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { X, User, Phone, Calendar, CreditCard, AlertCircle } from 'lucide-react';
-import { AppContext, formatDate, addDays } from '../context/AppContext.jsx';
+import React, { useState, useEffect } from 'react';
+import { X, User, Phone, Calendar, CreditCard } from 'lucide-react';
+import { formatDate, addDays } from '../context/AppContext.jsx';
 
 function AddMemberModal({ isOpen, onClose, onAdd }) {
-  const { members: allMembers, activeOutletId } = useContext(AppContext);
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [subscriptionTier, setSubscriptionTier] = useState('monthly');
@@ -11,9 +10,6 @@ function AddMemberModal({ isOpen, onClose, onAdd }) {
   const [joiningDate, setJoiningDate] = useState(formatDate(new Date()));
   const [nextDueDate, setNextDueDate] = useState('');
   const [status, setStatus] = useState('active');
-
-  // Filter members to only those belonging to the active outlet
-  const members = allMembers.filter(m => (m.gymId || 'owner_golds') === (activeOutletId || 'owner_golds'));
 
   // Auto calculate amount and due date based on tier selection and joining date
   useEffect(() => {
@@ -36,10 +32,6 @@ function AddMemberModal({ isOpen, onClose, onAdd }) {
   }, [subscriptionTier, joiningDate]);
 
   if (!isOpen) return null;
-
-  const isGrowthPlan = false;
-  const maxLimit = Infinity;
-  const limitReached = false;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -71,7 +63,7 @@ function AddMemberModal({ isOpen, onClose, onAdd }) {
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <h2 className="text-xl font-bold text-slate-100">
-            {limitReached ? 'Upgrade Required' : 'Add New Gym Member'}
+            Add New Gym Member
           </h2>
           <button 
             onClick={onClose}
@@ -81,82 +73,8 @@ function AddMemberModal({ isOpen, onClose, onAdd }) {
           </button>
         </div>
 
-        {limitReached ? (
-          <div className="py-8 text-center space-y-4 animate-in fade-in duration-200">
-            <div className="mx-auto w-12 h-12 bg-amber-500/10 border border-amber-500/25 rounded-full flex items-center justify-center text-amber-500 mb-2 animate-bounce">
-              <AlertCircle className="h-6 w-6" />
-            </div>
-            <h3 className="text-base font-extrabold text-slate-100">
-              Member Limit Reached
-            </h3>
-            
-            {/* Progress bar showing capacity is full */}
-            <div className="px-6">
-              <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-red-500 rounded-full w-full" />
-              </div>
-              <div className="flex items-center justify-between mt-1.5">
-                <span className="text-[9px] text-slate-500 font-bold">{members.length} members registered</span>
-                <span className="text-[9px] text-red-400 font-black uppercase tracking-wider">LIMIT: {maxLimit}</span>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-400 leading-relaxed px-2">
-              You currently have <strong className="text-slate-200">{members.length} members</strong>. 
-              The {isGrowthPlan ? 'Growth' : 'Starter'} Plan is limited to a maximum of <strong>{maxLimit} members</strong>. 
-              {isGrowthPlan ? (
-                <span>Please contact Navneet Nihal Lakra to request a custom <strong>Enterprise Plan</strong> with higher member limits.</span>
-              ) : (
-                <span>Upgrade to the <strong className="text-purple-400">Growth Plan</strong> to expand your capacity to <strong className="text-purple-400">400 members</strong>.</span>
-              )}
-            </p>
-            
-            <div className="pt-6 flex gap-3 border-t border-slate-800 mt-6">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 py-2.5 px-4 border border-slate-850 hover:bg-slate-800/50 text-slate-350 font-semibold rounded-xl text-xs transition cursor-pointer"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  window.location.href = '/profile?tab=billing';
-                }}
-                className="flex-1 py-2.5 px-4 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-purple-900/10 transition cursor-pointer"
-              >
-                {isGrowthPlan ? 'Contact for Enterprise' : 'Upgrade to Growth Plan'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* Form */
-          <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-
-          {/* Member capacity indicator */}
-          <div className="p-3 bg-slate-950/60 border border-slate-850 rounded-xl space-y-2">
-            <div className="flex items-center justify-between text-[10px]">
-              <span className="text-slate-400 font-bold uppercase tracking-wider">Member Capacity</span>
-              <span className="font-black">
-                <span className="text-slate-200">{members.length}</span>
-                <span className="text-slate-600 mx-0.5">/</span>
-                <span className={isGrowthPlan ? 'text-purple-400' : 'text-brand-primary'}>{maxLimit}</span>
-              </span>
-            </div>
-            <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ${
-                  members.length >= maxLimit * 0.9 ? 'bg-amber-500' : 'bg-emerald-500'
-                }`}
-                style={{ width: `${Math.min(100, (members.length / maxLimit) * 100)}%` }}
-              />
-            </div>
-            <span className="text-[8px] text-slate-500 font-semibold block">
-              {maxLimit - members.length} slots remaining · {isGrowthPlan ? 'Growth' : 'Starter'} Plan
-            </span>
-          </div>
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           
           {/* Member Name */}
           <div className="space-y-1">
@@ -292,7 +210,6 @@ function AddMemberModal({ isOpen, onClose, onAdd }) {
                 <option value="inactive">Inactive</option>
               </select>
             </div>
-
           </div>
 
           {/* Action buttons */}
@@ -312,7 +229,6 @@ function AddMemberModal({ isOpen, onClose, onAdd }) {
             </button>
           </div>
         </form>
-        )}
 
       </div>
     </div>

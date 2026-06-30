@@ -359,11 +359,7 @@ export const updateBillingRequestStatus = async (req, res) => {
 
         // Parse requested plan and allowed gyms from notes if present
         const notesText = billingReq.notes || '';
-        if (notesText.includes('Plan: growth')) {
-          client.pricingPlan = 'growth';
-        } else if (notesText.includes('Plan: basic') || notesText.includes('Plan: starter')) {
-          client.pricingPlan = 'basic';
-        }
+        client.pricingPlan = 'basic';
 
         if (notesText.includes('Gyms: 2')) {
           client.allowedGyms = 2;
