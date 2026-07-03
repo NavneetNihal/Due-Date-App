@@ -30,14 +30,6 @@ export const addMember = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
 
-    // Lockout check: Block member creation if the owner has never paid OR if the account is revoked/overdue
-    const hasPaid = user.billingPayments && user.billingPayments.length > 0;
-    if (user.subscriptionStatus === 'revoked' || user.subscriptionStatus === 'overdue' || !hasPaid) {
-      return res.status(403).json({ 
-        message: 'Member creation is locked. Please activate your license to unlock.' 
-      });
-    }
-
     if (!name || !phoneNumber || !subscriptionTier || amount === undefined) {
       return res.status(400).json({ message: 'Please provide all required fields' });
     }

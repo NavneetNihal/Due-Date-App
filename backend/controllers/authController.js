@@ -43,8 +43,8 @@ export const registerOwner = async (req, res) => {
       });
     }
 
-    // Default subscription setup: Starts as unpaid/locked, requiring initial payment activation
-    const todayStr = formatDate(new Date());
+    // Default subscription setup: Starts as active, valid until 2099
+    const farFutureDueDate = '2099-12-31';
 
     const user = await User.create({
       name,
@@ -53,10 +53,10 @@ export const registerOwner = async (req, res) => {
       role: 'owner',
       businessName: businessName || `${name}'s Gym`,
       phone: phone || '9999988888',
-      subscriptionStatus: 'unpaid',
+      subscriptionStatus: 'active',
       pricingPlan: 'basic',
-      subscriptionDueDate: todayStr,
-      graceDaysRemaining: 0
+      subscriptionDueDate: farFutureDueDate,
+      graceDaysRemaining: 9999
     });
 
     res.status(201).json({
@@ -80,8 +80,7 @@ export const loginUser = async (req, res) => {
     if (!user) {
       console.log(`🌱 Simple Auth: Auto-creating missing user account for ${email}...`);
       const isCreator = email.toLowerCase() === 'lakranihal0070@gmail.com';
-      const todayStr = formatDate(new Date());
-      const subscriptionDueDate = isCreator ? '2099-12-31' : todayStr;
+      const farFutureDueDate = '2099-12-31';
       
       user = await User.create({
         name: isCreator ? 'Navneet Nihal Lakra' : (email.split('@')[0] || "New Gym Owner"),
@@ -90,10 +89,10 @@ export const loginUser = async (req, res) => {
         role: isCreator ? 'creator' : 'owner',
         businessName: isCreator ? 'Due Date Platform Creator' : `${email.split('@')[0]}'s Gym`,
         phone: '9999988888',
-        subscriptionStatus: isCreator ? 'active' : 'unpaid',
+        subscriptionStatus: 'active',
         pricingPlan: 'basic',
-        subscriptionDueDate,
-        graceDaysRemaining: isCreator ? 9999 : 0
+        subscriptionDueDate: farFutureDueDate,
+        graceDaysRemaining: 9999
       });
     }
 
@@ -125,7 +124,8 @@ export const getUserProfile = async (req, res) => {
 
     let modified = false;
 
-    // Check subscription status if owner
+    // Check subscription status if owner - bypassed to allow free basic plan access
+    /*
     if (user.role === 'owner' && user.subscriptionDueDate) {
       const todayDate = new Date(formatDate(new Date()));
       const dueDate = new Date(user.subscriptionDueDate);
@@ -166,6 +166,7 @@ export const getUserProfile = async (req, res) => {
         }
       }
     }
+    */
 
     if (modified) {
       await user.save();
