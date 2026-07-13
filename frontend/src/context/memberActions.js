@@ -1,50 +1,6 @@
 import api from '../api.js';
 
 export const useMemberActions = (members, setMembers, activeOutletId, setPayments) => {
-  const simulate200Members = async () => {
-    console.log('Simulating test members...');
-    const activeGymId = activeOutletId || 'owner_golds';
-    
-    try {
-      for (let i = 0; i < 10; i++) {
-        const response = await api.post('/members', {
-          name: `Test Member ${i + 1}`,
-          phoneNumber: '9876500000',
-          subscriptionTier: 'monthly',
-          amount: 1000,
-          gymId: activeGymId
-        });
-        const newMember = response.data;
-        setMembers(prev => [newMember, ...prev]);
-      }
-    } catch (err) {
-      console.warn('Simulation member API error, falling back to mock:', err);
-      
-      const savedMembers = localStorage.getItem('mock_members');
-      let membersList = savedMembers ? JSON.parse(savedMembers) : [];
-      
-      for (let i = 0; i < 10; i++) {
-        const newMockMember = {
-          _id: `mock_mem_${Date.now()}_${i}`,
-          ownerId: 'mock_owner_id',
-          gymId: activeGymId,
-          name: `Test Member ${i + 1}`,
-          phoneNumber: '9876500000',
-          joiningDate: '2026-06-29',
-          subscriptionTier: 'monthly',
-          amount: 1000,
-          subscriptionAmount: 1000,
-          nextDueDate: '2026-07-29',
-          status: 'active'
-        };
-        membersList.unshift(newMockMember);
-      }
-      
-      localStorage.setItem('mock_members', JSON.stringify(membersList));
-      setMembers(membersList);
-    }
-  };
-
   const addMember = async (memberData) => {
     try {
       const response = await api.post('/members', {
@@ -58,7 +14,9 @@ export const useMemberActions = (members, setMembers, activeOutletId, setPayment
       });
 
       const newMember = response.data;
-      setMembers(prev => [newMember, ...prev]);
+      // Map both id and _id just to be safe
+      const enrichedMember = { ...newMember, id: newMember._id || newMember.id };
+      setMembers(prev => [enrichedMember, ...prev]);
 
       if (memberData.isPaid) {
         const payResponse = await api.post('/payments/pay', {
@@ -68,15 +26,18 @@ export const useMemberActions = (members, setMembers, activeOutletId, setPayment
         });
 
         const payData = payResponse.data;
-        setMembers(prev => prev.map(m => m._id === newMember._id ? payData.member : m));
+        const enrichedPaidMember = { ...payData.member, id: payData.member._id || payData.member.id };
+        setMembers(prev => prev.map(m => m._id === newMember._id ? enrichedPaidMember : m));
         setPayments(prev => [payData.payment, ...prev]);
       }
       return true;
     } catch (error) {
-      console.warn('Add member API error, falling back to mock:', error);
+      console.warn('Add member API error, falling back to mock storage:', error);
       
+      const mockId = `mock_mem_${Date.now()}`;
       const newMockMember = {
-        _id: `mock_mem_${Date.now()}`,
+        _id: mockId,
+        id: mockId,
         ownerId: 'mock_owner_id',
         gymId: memberData.gymId || activeOutletId || 'owner_golds',
         name: memberData.name,
@@ -96,9 +57,11 @@ export const useMemberActions = (members, setMembers, activeOutletId, setPayment
       setMembers(membersList);
 
       if (memberData.isPaid) {
+        const mockPayId = `mock_pay_${Date.now()}`;
         const newMockPayment = {
-          _id: `mock_pay_${Date.now()}`,
-          memberId: newMockMember._id,
+          _id: mockPayId,
+          id: mockPayId,
+          memberId: newMockMember.id,
           memberName: newMockMember.name,
           gymId: newMockMember.gymId,
           amountPaid: newMockMember.amount,
@@ -121,15 +84,15 @@ export const useMemberActions = (members, setMembers, activeOutletId, setPayment
   const deleteMember = async (id) => {
     try {
       await api.delete(`/members/${id}`);
-      setMembers(prev => prev.filter(m => m._id !== id));
+      setMembers(prev => prev.filter(m => m._id !== id && m.id !== id));
       setPayments(prev => prev.filter(p => p.memberId !== id));
       return true;
     } catch (error) {
-      console.warn('Delete member API error, falling back to mock:', error);
+      console.warn('Delete member API error, falling back to mock storage:', error);
       
       const savedMembers = localStorage.getItem('mock_members');
       let membersList = savedMembers ? JSON.parse(savedMembers) : [];
-      membersList = membersList.filter(m => m._id !== id);
+      membersList = membersList.filter(m => m._id !== id && m.id !== id);
       localStorage.setItem('mock_members', JSON.stringify(membersList));
       setMembers(membersList);
 
@@ -143,7 +106,6 @@ export const useMemberActions = (members, setMembers, activeOutletId, setPayment
   };
 
   return {
-    simulate200Members,
     addMember,
     deleteMember
   };
