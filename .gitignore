@@ -36,3 +36,6 @@ lerna-debug.log*
 *.sw?
 *.new-rule.md 
 GEMINI.md
+
+# WhatsApp Web Session (contains login credentials - never push)
+.wwebjs_auth/
