@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './config/db.js';
+import { initWhatsApp } from './utils/reminderService.js';
+import { startScheduler } from './utils/scheduler.js';
 
 // Route Imports
 import authRoutes from './routes/authRoutes.js';
@@ -12,8 +14,11 @@ import creatorRoutes from './routes/creatorRoutes.js';
 // Load environmental variables
 dotenv.config();
 
-// Connect to MongoDB Database
-connectDB();
+// Connect to MongoDB Database and start background service routines
+connectDB().then(() => {
+  startScheduler();
+  initWhatsApp();
+});
 
 const app = express();
 

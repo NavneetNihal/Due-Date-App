@@ -1,0 +1,6 @@
+2026/07/14-00:02:11.649 16db0 Reusing MANIFEST /Users/nihal/Desktop/Due Date App/backend/.wwebjs_auth/session/Default/Local Storage/leveldb/MANIFEST-000001
+2026/07/14-00:02:11.649 16db0 Recovering log #4
+2026/07/14-00:02:11.650 16db0 Reusing old log /Users/nihal/Desktop/Due Date App/backend/.wwebjs_auth/session/Default/Local Storage/leveldb/000004.log 
+2026/07/14-00:03:11.652 16dae Level-0 table #7: started
+2026/07/14-00:03:11.654 16dae Level-0 table #7: 14377 bytes OK
+2026/07/14-00:03:11.657 16dae Delete type=0 #4

@@ -16,7 +16,11 @@ export const useMemberActions = (members, setMembers, activeOutletId, setPayment
       const newMember = response.data;
       // Map both id and _id just to be safe
       const enrichedMember = { ...newMember, id: newMember._id || newMember.id };
-      setMembers(prev => [enrichedMember, ...prev]);
+      setMembers(prev => {
+        const updated = [enrichedMember, ...prev];
+        localStorage.setItem('mock_members', JSON.stringify(updated));
+        return updated;
+      });
 
       if (memberData.isPaid) {
         const payResponse = await api.post('/payments/pay', {
@@ -84,11 +88,25 @@ export const useMemberActions = (members, setMembers, activeOutletId, setPayment
   const deleteMember = async (id) => {
     try {
       await api.delete(`/members/${id}`);
-      setMembers(prev => prev.filter(m => m._id !== id && m.id !== id));
-      setPayments(prev => prev.filter(p => p.memberId !== id));
+      setMembers(prev => {
+        const updated = prev.filter(m => m._id !== id && m.id !== id);
+        localStorage.setItem('mock_members', JSON.stringify(updated));
+        return updated;
+      });
+      setPayments(prev => {
+        const updated = prev.filter(p => p.memberId !== id);
+        localStorage.setItem('mock_payments', JSON.stringify(updated));
+        return updated;
+      });
       return true;
     } catch (error) {
-      console.warn('Delete member API error, falling back to mock storage:', error);
+      // Only fall back to local-only delete for mock IDs (offline mode)
+      const isMockId = String(id).startsWith('mock_');
+      if (!isMockId) {
+        console.error('Delete member API error (real ID, not falling back):', error);
+        return false;
+      }
+      console.warn('Delete member offline fallback for mock ID:', id);
       
       const savedMembers = localStorage.getItem('mock_members');
       let membersList = savedMembers ? JSON.parse(savedMembers) : [];

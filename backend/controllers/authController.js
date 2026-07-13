@@ -212,7 +212,7 @@ export const updateOwnerSettings = async (req, res) => {
 // @route   PUT /api/auth/profile
 // @access  Private (Owner Only)
 export const updateOwnerProfile = async (req, res) => {
-  const { name, businessName, phone } = req.body;
+  const { name, businessName, phone, settings } = req.body;
 
   try {
     const user = await User.findById(req.user._id);
@@ -223,6 +223,11 @@ export const updateOwnerProfile = async (req, res) => {
     if (name) user.name = name;
     if (businessName) user.businessName = businessName;
     if (phone) user.phone = phone;
+
+    if (settings) {
+      if (settings.upiId !== undefined) user.settings.upiId = settings.upiId;
+      if (settings.qrCode !== undefined) user.settings.qrCode = settings.qrCode;
+    }
 
     await user.save();
 

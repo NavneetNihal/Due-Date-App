@@ -109,13 +109,19 @@ export const AppProvider = ({ children }) => {
           const ledgerResp = await api.get('/creator/ledger');
           setBillingRequests(ledgerResp.data.logs.map(r => ({ ...r, id: r._id || r.id })));
         } else {
-          // Load members
+          // Load members from backend (primary source)
           const membersResp = await api.get(`/members?gymId=${activeOutletId}`);
-          setMembers(membersResp.data.map(m => ({ ...m, id: m._id || m.id })));
+          const freshMembers = membersResp.data.map(m => ({ ...m, id: m._id || m.id }));
+          setMembers(freshMembers);
+          // Cache to localStorage as failsafe
+          localStorage.setItem('mock_members', JSON.stringify(freshMembers));
 
           // Load accounting payments history
           const paymentsResp = await api.get(`/payments?gymId=${activeOutletId}`);
-          setPayments(paymentsResp.data.map(p => ({ ...p, id: p._id || p.id })));
+          const freshPayments = paymentsResp.data.map(p => ({ ...p, id: p._id || p.id }));
+          setPayments(freshPayments);
+          // Cache to localStorage as failsafe
+          localStorage.setItem('mock_payments', JSON.stringify(freshPayments));
 
           // Fetch owner's billing requests for persistence
           const ledgerResp = await api.get('/creator/ledger');

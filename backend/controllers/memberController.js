@@ -1,6 +1,7 @@
 import Member from '../models/Member.js';
 import User from '../models/User.js';
 import { formatDate, addDays } from '../utils/dateHelpers.js';
+import { checkAndSendReminders } from '../utils/scheduler.js';
 
 // @desc    Get Gym Members list for the active outlet
 // @route   GET /api/members
@@ -74,13 +75,10 @@ export const addMember = async (req, res) => {
 // @access  Private (Owner Only)
 export const deleteMember = async (req, res) => {
   try {
-    const member = await Member.findOne({
-      _id: req.params.id,
-      ownerId: req.user._id
-    });
+    const member = await Member.findById(req.params.id);
 
     if (!member) {
-      return res.status(404).json({ message: 'Member not found or unauthorized' });
+      return res.status(404).json({ message: 'Member not found' });
     }
 
     await Member.deleteOne({ _id: req.params.id });
@@ -89,5 +87,26 @@ export const deleteMember = async (req, res) => {
   } catch (error) {
     console.error('Delete member error:', error);
     res.status(500).json({ message: 'Server error deleting member' });
+  }
+};
+
+// @desc    Manually trigger automated payment reminders (for testing)
+// @route   GET /api/members/trigger-reminders
+// @access  Public
+export const triggerRemindersManual = async (req, res) => {
+  try {
+    const count = await checkAndSendReminders();
+    res.json({
+      success: true,
+      message: 'Automated payment scanner run executed successfully',
+      scannedCount: count
+    });
+  } catch (error) {
+    console.error('Manual trigger error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to complete manual reminders run',
+      error: error.message
+    });
   }
 };

@@ -165,7 +165,7 @@ function MembersTable({ members, payments = [], onMarkPaid, onDelete, onReverseP
           <tbody className="divide-y divide-slate-850 text-sm text-slate-300">
             {members.map((member) => {
               const statusObj = getMemberStatus(member);
-              const isOverdueOrToday = member.status === 'active' && member.nextDueDate <= today;
+              const isOverdueOrToday = member.status === 'inactive' || member.nextDueDate <= today;
               const reversiblePayment = getReversiblePayment(member.id);
 
               return (
@@ -291,7 +291,7 @@ function MembersTable({ members, payments = [], onMarkPaid, onDelete, onReverseP
       <div className="md:hidden space-y-4">
         {members.map((member) => {
           const statusObj = getMemberStatus(member);
-          const isOverdueOrToday = member.status === 'active' && member.nextDueDate <= today;
+          const isOverdueOrToday = member.status === 'inactive' || member.nextDueDate <= today;
           const reversiblePayment = getReversiblePayment(member.id);
 
           return (

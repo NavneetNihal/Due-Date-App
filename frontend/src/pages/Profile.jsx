@@ -127,7 +127,7 @@ function Profile() {
 
 
   const getMessagePreview = () => {
-    return `Hello Navneet Nihal Lakra, this is a friendly reminder from *${businessName || 'your gym'}*. Your subscription fee of *₹1,000* is due on *2026-06-26*. 
+    return `Hello [Member Name], this is a friendly reminder from *${businessName || 'your gym'}*. Your subscription fee of *₹1,000* is due on *2026-06-26*. 
 
 Please pay via UPI using ID: *${upiId || 'your-upi-id'}* (QR attached) and *send a screenshot* of the transaction receipt to this chat to confirm your payment.
 
