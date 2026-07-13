@@ -39,3 +39,4 @@ GEMINI.md
 
 # WhatsApp Web Session (contains login credentials - never push)
 .wwebjs_auth/
+.wwebjs_cache/
