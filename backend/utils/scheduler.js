@@ -52,11 +52,11 @@ export const checkAndSendReminders = async () => {
         
         const success = await sendWhatsAppMessage(member.phoneNumber, fullMessage, qrCode);
         if (success) {
-          // Only update status to inactive (unpaid) if the due date is reached or passed (unpaid)
-          if (member.nextDueDate === todayStr || new Date(member.nextDueDate) < new Date(todayStr)) {
+          // Only mark inactive after 10 days overdue (final warning sent)
+          if (member.nextDueDate === tenDaysOverdueStr) {
             member.status = 'inactive';
             await member.save();
-            console.log(`✅ Member ${member.name} marked as inactive (unpaid) until payment completed`);
+            console.log(`✅ Member ${member.name} marked inactive after 10 days overdue`);
           }
         }
       }

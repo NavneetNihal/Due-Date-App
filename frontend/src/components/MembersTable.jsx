@@ -42,8 +42,6 @@ function MembersTable({ members, payments = [], onMarkPaid, onDelete, onReverseP
   };
 
   const getReminderScheduleState = (member) => {
-    if (member.status === 'inactive') return null;
-
     const nextDue = new Date(member.nextDueDate);
     const todayDate = new Date(today);
     const diffTime = nextDue - todayDate;
@@ -100,16 +98,9 @@ function MembersTable({ members, payments = [], onMarkPaid, onDelete, onReverseP
 
   // Helper to determine status type and styles
   const getMemberStatus = (member) => {
-    if (member.status === 'inactive') {
-      return {
-        label: 'Inactive',
-        bg: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
-        textClass: 'text-slate-400'
-      };
-    }
-
+    // Always compute overdue/due-today first — status field is only used for Inactive
+    // after 10 days overdue (set by scheduler), but we still show the overdue days.
     if (member.nextDueDate < today) {
-      // Overdue
       const due = new Date(member.nextDueDate);
       const diffTime = Math.abs(new Date(today) - due);
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -129,6 +120,14 @@ function MembersTable({ members, payments = [], onMarkPaid, onDelete, onReverseP
       };
     }
 
+    if (member.status === 'inactive') {
+      return {
+        label: 'Inactive',
+        bg: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+        textClass: 'text-slate-400'
+      };
+    }
+
     // Active & Paid
     return {
       label: 'Active',
@@ -136,6 +135,7 @@ function MembersTable({ members, payments = [], onMarkPaid, onDelete, onReverseP
       textClass: 'text-emerald-400'
     };
   };
+
 
   if (members.length === 0) {
     return (
@@ -165,7 +165,7 @@ function MembersTable({ members, payments = [], onMarkPaid, onDelete, onReverseP
           <tbody className="divide-y divide-slate-850 text-sm text-slate-300">
             {members.map((member) => {
               const statusObj = getMemberStatus(member);
-              const isOverdueOrToday = member.status === 'inactive' || member.nextDueDate <= today;
+              const isOverdueOrToday = member.nextDueDate <= today;
               const reversiblePayment = getReversiblePayment(member.id);
 
               return (
@@ -291,7 +291,7 @@ function MembersTable({ members, payments = [], onMarkPaid, onDelete, onReverseP
       <div className="md:hidden space-y-4">
         {members.map((member) => {
           const statusObj = getMemberStatus(member);
-          const isOverdueOrToday = member.status === 'inactive' || member.nextDueDate <= today;
+          const isOverdueOrToday = member.nextDueDate <= today;
           const reversiblePayment = getReversiblePayment(member.id);
 
           return (
