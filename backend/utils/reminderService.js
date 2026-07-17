@@ -15,6 +15,7 @@ export const initWhatsApp = () => {
     }),
     puppeteer: {
       headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -26,6 +27,7 @@ export const initWhatsApp = () => {
         '--disable-gpu'
       ]
     }
+
   });
 
   client.on('qr', (qr) => {
