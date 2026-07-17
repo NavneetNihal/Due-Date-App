@@ -66,7 +66,7 @@ const userSchema = new mongoose.Schema({
   settings: {
     upiId: { type: String, default: 'goldsgym@okaxis' },
     qrCode: { type: String, default: '' },
-    whatsappTemplate: { type: String, default: 'Hello *{memberName}*,\n\nThis is a payment reminder from *{businessName}*.\nYour *{subscriptionTier}* subscription of *₹{amount}* is due on *{dueDate}*.\n\nPlease pay using our UPI ID: *{upiId}*.\n\nThank you!' },
+    whatsappTemplate: { type: String, default: 'Hello *{memberName}*,\n\nThis is a *{reminderType}* payment reminder from *{businessName}*.\nYour *{subscriptionTier}* subscription of *₹{amount}* is *{statusText}*.\n\nPlease pay using our UPI ID: *{upiId}*.\n\nThank you!' },
     reminderFrequency: { type: String, default: 'standard' }
   },
   billingPayments: [{

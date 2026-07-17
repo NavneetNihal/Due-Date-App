@@ -9,14 +9,16 @@ import { protect, authorizeRoles } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Manual trigger route for reminders (public test endpoint)
-router.get('/trigger-reminders', triggerRemindersManual);
-
 router.use(protect);
-router.use(authorizeRoles('owner'));
 
+// Manual trigger route for reminders (protected test endpoint)
+router.get('/trigger-reminders', authorizeRoles('owner', 'creator'), triggerRemindersManual);
+
+// Other member routes are owner-only
+router.use(authorizeRoles('owner'));
 router.get('/', getMembers);
 router.post('/', addMember);
 router.delete('/:id', deleteMember);
 
 export default router;
+
