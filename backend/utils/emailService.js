@@ -31,3 +31,27 @@ export const sendVerificationEmail = async (toEmail, code) => {
     `
   });
 };
+
+export const sendPasswordResetEmail = async (toEmail, code) => {
+  const transporter = getTransporter();
+
+  await transporter.sendMail({
+    from: `"Due Date App" <${process.env.GMAIL_USER}>`,
+    to: toEmail,
+    subject: `Password Reset Verification Code: ${code}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #0a0f18; color: #e2e8f0; padding: 32px; border-radius: 16px; border: 1px solid #1e293b;">
+        <h2 style="color: #a78bfa; margin-bottom: 8px;">Due Date App</h2>
+        <p style="color: #94a3b8; margin-bottom: 24px;">Gym Payment Reminder Platform</p>
+        <hr style="border-color: #1e293b; margin-bottom: 24px;" />
+        <h3 style="margin-bottom: 8px;">Reset your password</h3>
+        <p style="color: #94a3b8; margin-bottom: 24px;">Use the code below to reset your account password. It expires in <strong>10 minutes</strong>.</p>
+        <div style="background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; text-align: center; letter-spacing: 12px; font-size: 36px; font-weight: bold; color: #f43f5e; margin-bottom: 24px;">
+          ${code}
+        </div>
+        <p style="color: #64748b; font-size: 13px;">If you did not request a password reset, please ignore this email or change your password if you suspect unauthorized access.</p>
+      </div>
+    `
+  });
+};
+

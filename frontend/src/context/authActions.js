@@ -125,6 +125,26 @@ export const useAuthActions = (user, setUser, _gymOwners, _setGymOwners) => {
     }
   };
 
+  const requestPasswordReset = async (email) => {
+    try {
+      const response = await api.post('/auth/forgot-password', { email });
+      return { success: true, emailSent: response.data.emailSent !== false };
+    } catch (error) {
+      console.error('Request password reset error:', error.response?.data?.message || error.message);
+      return { success: false, message: error.response?.data?.message || 'Failed to request reset' };
+    }
+  };
+
+  const submitPasswordReset = async (email, code, password) => {
+    try {
+      await api.post('/auth/reset-password', { email, code, password });
+      return { success: true };
+    } catch (error) {
+      console.error('Reset password error:', error.response?.data?.message || error.message);
+      return { success: false, message: error.response?.data?.message || 'Failed to reset password' };
+    }
+  };
+
   const logout = () => {
     setUser(null);
     localStorage.removeItem('owner_user');
@@ -198,6 +218,8 @@ export const useAuthActions = (user, setUser, _gymOwners, _setGymOwners) => {
     login,
     register,
     verifyEmailCode,
+    requestPasswordReset,
+    submitPasswordReset,
     logout,
     updateSettings,
     updateProfile,

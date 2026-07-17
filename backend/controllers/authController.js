@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { formatDate, addDays } from '../utils/dateHelpers.js';
-import { sendVerificationEmail } from '../utils/emailService.js';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/emailService.js';
+
 
 // Helper to generate JWT Token
 const generateToken = (id) => {
@@ -348,3 +349,83 @@ export const startFreeTrial = async (req, res) => {
     res.status(500).json({ message: 'Server error starting free trial' });
   }
 };
+
+// @desc    Request password reset OTP code
+// @route   POST /api/auth/forgot-password
+// @access  Public
+export const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: 'Email is required' });
+  }
+
+  try {
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!user) {
+      // Security best practice: don't reveal if email doesn't exist
+      return res.json({ message: 'If this email exists in our records, a reset code has been sent.' });
+    }
+
+    const code = generateOTP();
+    user.resetPasswordCode = code;
+    user.resetPasswordExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    await user.save();
+
+    let emailSent = true;
+    try {
+      await sendPasswordResetEmail(user.email, code);
+    } catch (emailErr) {
+      emailSent = false;
+      console.error('Reset password email failed:', emailErr.message);
+    }
+
+    res.json({
+      emailSent,
+      message: emailSent
+        ? 'If this email exists in our records, a reset code has been sent.'
+        : 'Failed to send reset email. Contact administrator.'
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ message: 'Server error during forgot password request' });
+  }
+};
+
+// @desc    Reset password using OTP code
+// @route   POST /api/auth/reset-password
+// @access  Public
+export const resetPassword = async (req, res) => {
+  const { email, code, password } = req.body;
+
+  if (!email || !code || !password) {
+    return res.status(400).json({ message: 'All fields (email, code, new password) are required' });
+  }
+
+  try {
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!user) {
+      return res.status(404).json({ message: 'Account not found' });
+    }
+
+    if (!user.resetPasswordCode || user.resetPasswordCode !== code) {
+      return res.status(400).json({ message: 'Invalid verification code' });
+    }
+
+    if (user.resetPasswordExpiry < new Date()) {
+      return res.status(400).json({ message: 'Verification code expired. Request a new one.' });
+    }
+
+    // Set new password (hooks will hash it on save)
+    user.passwordHash = password;
+    user.resetPasswordCode = null;
+    user.resetPasswordExpiry = null;
+    await user.save();
+
+    res.json({ message: 'Password reset successful! You can now log in.' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Server error resetting password' });
+  }
+};
+

@@ -3,6 +3,8 @@ import {
   registerOwner, 
   loginUser,
   verifyEmail,
+  forgotPassword,
+  resetPassword,
   getUserProfile, 
   updateOwnerProfile, 
   updateOwnerSettings,
@@ -16,6 +18,9 @@ const router = express.Router();
 router.post('/register', registerOwner);
 router.post('/login', loginUser);
 router.post('/verify-email', verifyEmail);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
+
 
 // Temp debug: check if email exists in DB (safe — no password exposed)
 router.get('/check/:email', async (req, res) => {

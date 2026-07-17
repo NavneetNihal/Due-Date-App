@@ -88,7 +88,17 @@ const userSchema = new mongoose.Schema({
   emailVerificationExpiry: {
     type: Date,
     default: null
+  },
+  // Password reset
+  resetPasswordCode: {
+    type: String,
+    default: null
+  },
+  resetPasswordExpiry: {
+    type: Date,
+    default: null
   }
+
 }, {
   timestamps: true
 });
