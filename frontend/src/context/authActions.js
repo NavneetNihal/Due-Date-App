@@ -68,12 +68,15 @@ export const useAuthActions = (user, setUser, _gymOwners, _setGymOwners) => {
       localStorage.setItem('jwt_token', data.token);
       return true;
     } catch (error) {
-      console.warn('Login API error, falling back to mock login (offline mode):', error);
-      const mockUser = generateMockUser(email);
-      setUser(mockUser);
-      localStorage.setItem('owner_user', JSON.stringify(mockUser));
-      localStorage.setItem('jwt_token', 'mock_jwt_token_123');
-      return true;
+      if (error.response?.status === 403 && error.response?.data?.requiresVerification) {
+        return { requiresVerification: true, email };
+      }
+      // No response = server is down or unreachable
+      if (!error.response) {
+        return { serverError: true };
+      }
+      console.error('Login failed:', error.response?.data?.message || error.message);
+      return false;
     }
   };
 
@@ -86,19 +89,39 @@ export const useAuthActions = (user, setUser, _gymOwners, _setGymOwners) => {
         businessName: username ? `${username}'s Gym` : "My Gym",
         phone: '9999988888'
       });
- 
+
+      const data = response.data;
+
+      // Backend signals that OTP was sent — don't log in yet
+      if (data.requiresVerification) {
+        return { requiresVerification: true, email, emailSent: data.emailSent !== false };
+      }
+
+      setUser(data.user);
+      localStorage.setItem('owner_user', JSON.stringify(data.user));
+      localStorage.setItem('jwt_token', data.token);
+      return true;
+    } catch (error) {
+      // 409 = email already verified and registered
+      if (error.response?.status === 409) return { alreadyExists: true };
+      // No response = server down
+      if (!error.response) return { serverError: true };
+      console.error('Register error:', error);
+      return { serverError: true };
+    }
+  };
+
+  const verifyEmailCode = async (email, code) => {
+    try {
+      const response = await api.post('/auth/verify-email', { email, code });
       const data = response.data;
       setUser(data.user);
       localStorage.setItem('owner_user', JSON.stringify(data.user));
       localStorage.setItem('jwt_token', data.token);
       return true;
     } catch (error) {
-      console.warn('Register API error, falling back to mock registration (offline mode):', error);
-      const mockUser = generateMockUser(email, username);
-      setUser(mockUser);
-      localStorage.setItem('owner_user', JSON.stringify(mockUser));
-      localStorage.setItem('jwt_token', 'mock_jwt_token_123');
-      return true;
+      console.error('Verify email error:', error.response?.data?.message || error.message);
+      return false;
     }
   };
 
@@ -174,6 +197,7 @@ export const useAuthActions = (user, setUser, _gymOwners, _setGymOwners) => {
   return {
     login,
     register,
+    verifyEmailCode,
     logout,
     updateSettings,
     updateProfile,

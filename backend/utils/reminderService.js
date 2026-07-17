@@ -8,7 +8,7 @@ let isReady = false;
 // Initialize WhatsApp Web Client
 export const initWhatsApp = () => {
   console.log('🚀 Initializing WhatsApp Web Client...');
-  
+
   client = new Client({
     authStrategy: new LocalAuth({
       dataPath: './.wwebjs_auth'
@@ -73,7 +73,7 @@ export const sendWhatsAppMessage = async (phoneNumber, message, qrCodeBase64) =>
   try {
     // Sanitize phone number to keep only digits
     let sanitized = phoneNumber.replace(/\D/g, '');
-    
+
     // Default country code to India (91) if it's a 10 digit number
     if (sanitized.length === 10) {
       sanitized = '91' + sanitized;
@@ -90,14 +90,14 @@ export const sendWhatsAppMessage = async (phoneNumber, message, qrCodeBase64) =>
       } else {
         media = new MessageMedia('image/jpeg', qrCodeBase64, 'upi_qr.jpg');
       }
-      
+
       // Send image with caption text
       await client.sendMessage(chatId, media, { caption: message });
     } else {
       // Send plain text message
       await client.sendMessage(chatId, message);
     }
-    
+
     console.log(`✅ WhatsApp message sent to ${phoneNumber}`);
     return true;
   } catch (error) {

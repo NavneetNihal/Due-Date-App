@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { formatDate, addDays } from '../utils/dateHelpers.js';
+import { sendVerificationEmail } from '../utils/emailService.js';
 
 // Helper to generate JWT Token
 const generateToken = (id) => {
@@ -8,6 +9,9 @@ const generateToken = (id) => {
     expiresIn: '30d'
   });
 };
+
+// Helper to generate a 6-digit OTP
+const generateOTP = () => String(Math.floor(100000 + Math.random() * 900000));
 
 const formatUserResponse = (user) => ({
   id: user._id,
@@ -22,6 +26,7 @@ const formatUserResponse = (user) => ({
   graceDaysRemaining: user.graceDaysRemaining,
   isTrial: user.isTrial,
   trialUsed: user.trialUsed,
+  isEmailVerified: user.isEmailVerified,
   settings: user.settings,
   billingPayments: user.billingPayments,
   allowedGyms: user.allowedGyms
@@ -33,35 +38,67 @@ const formatUserResponse = (user) => ({
 export const registerOwner = async (req, res) => {
   const { name, email, password, businessName, phone } = req.body;
 
+  if (!name || !email || !password) {
+    return res.status(400).json({ message: 'Name, email and password are required' });
+  }
+
   try {
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      console.log(`🌱 Simple Auth: Auto-logging in existing user account for ${email} during registration...`);
+    const existing = await User.findOne({ email: email.toLowerCase().trim() });
+    if (existing) {
+      // Already registered and verified → tell them to log in
+      if (existing.isEmailVerified) {
+        return res.status(409).json({ message: 'Email already registered. Please log in.' });
+      }
+      // Already registered but NOT verified → send a new OTP and show OTP screen
+      const code = generateOTP();
+      existing.emailVerificationCode = code;
+      existing.emailVerificationExpiry = new Date(Date.now() + 10 * 60 * 1000);
+      await existing.save();
+      // Try to send email — don't crash if it fails
+      try { await sendVerificationEmail(email, code); } catch (emailErr) {
+        console.error('Email send failed (resend):', emailErr.message);
+      }
       return res.status(200).json({
-        token: generateToken(userExists._id),
-        user: formatUserResponse(userExists)
+        requiresVerification: true,
+        message: 'A new verification code has been sent to your email.'
       });
     }
 
-    // Default subscription setup: Starts as active, valid until 2099
-    const farFutureDueDate = '2099-12-31';
+    // New registration — give owner a 7-day free trial
+    const code = generateOTP();
+    const expiry = new Date(Date.now() + 10 * 60 * 1000);
 
-    const user = await User.create({
+    await User.create({
       name,
-      email,
-      passwordHash: password, // auto-hashed by User model schema hooks
+      email: email.toLowerCase().trim(),
+      passwordHash: password,
       role: 'owner',
       businessName: businessName || `${name}'s Gym`,
       phone: phone || '9999988888',
-      subscriptionStatus: 'active',
+      subscriptionStatus: 'unpaid',
       pricingPlan: 'basic',
-      subscriptionDueDate: farFutureDueDate,
-      graceDaysRemaining: 9999
+      subscriptionDueDate: formatDate(new Date()),
+      graceDaysRemaining: 0,
+      isTrial: false,
+      trialUsed: false,
+      isEmailVerified: false,
+      emailVerificationCode: code,
+      emailVerificationExpiry: expiry
     });
 
+    // Try to send OTP email — if it fails, OTP screen still shows
+    let emailSent = true;
+    try { await sendVerificationEmail(email, code); } catch (emailErr) {
+      emailSent = false;
+      console.error('Email send failed:', emailErr.message);
+    }
+
     res.status(201).json({
-      token: generateToken(user._id),
-      user: formatUserResponse(user)
+      requiresVerification: true,
+      emailSent,
+      message: emailSent
+        ? 'Account created! Check your email for a 6-digit verification code.'
+        : 'Account created! Email sending failed — check server Gmail config.'
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -69,37 +106,124 @@ export const registerOwner = async (req, res) => {
   }
 };
 
-// @desc    Login User (Gym Owner or Admin Creator)
+
+// @desc    Verify email OTP after registration
+// @route   POST /api/auth/verify-email
+// @access  Public
+export const verifyEmail = async (req, res) => {
+  const { email, code } = req.body;
+
+  if (!email || !code) {
+    return res.status(400).json({ message: 'Email and code are required' });
+  }
+
+  try {
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!user) {
+      return res.status(404).json({ message: 'Account not found' });
+    }
+
+    if (user.isEmailVerified) {
+      return res.json({
+        token: generateToken(user._id),
+        user: formatUserResponse(user)
+      });
+    }
+
+    if (!user.emailVerificationCode || user.emailVerificationCode !== code) {
+      return res.status(400).json({ message: 'Invalid verification code' });
+    }
+
+    if (user.emailVerificationExpiry < new Date()) {
+      return res.status(400).json({ message: 'Verification code expired. Please register again to get a new code.' });
+    }
+
+    // Mark verified, clear OTP
+    user.isEmailVerified = true;
+    user.emailVerificationCode = null;
+    user.emailVerificationExpiry = null;
+    await user.save();
+
+    res.json({
+      token: generateToken(user._id),
+      user: formatUserResponse(user)
+    });
+  } catch (error) {
+    console.error('Verify email error:', error);
+    res.status(500).json({ message: 'Server error during verification' });
+  }
+};
+
+// @desc    Login User (Gym Owner or Creator)
 // @route   POST /api/auth/login
 // @access  Public
 export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required' });
+  }
+
   try {
-    let user = await User.findOne({ email });
-    if (!user) {
-      console.log(`🌱 Simple Auth: Auto-creating missing user account for ${email}...`);
-      const isCreator = email.toLowerCase() === 'lakranihal0070@gmail.com';
-      const farFutureDueDate = '2099-12-31';
-      
-      user = await User.create({
-        name: isCreator ? 'Navneet Nihal Lakra' : (email.split('@')[0] || "New Gym Owner"),
-        email: email,
-        passwordHash: password || 'default123',
-        role: isCreator ? 'creator' : 'owner',
-        businessName: isCreator ? 'Due Date Platform Creator' : `${email.split('@')[0]}'s Gym`,
-        phone: '9999988888',
-        subscriptionStatus: 'active',
-        pricingPlan: 'basic',
-        subscriptionDueDate: farFutureDueDate,
-        graceDaysRemaining: 9999
+    // ── Creator login ─────────────────────────────────────────────────────────
+    const creatorEmail = (process.env.CREATOR_EMAIL || 'lakranihal0070@gmail.com').toLowerCase().trim().replace(/\r/g, '');
+    const creatorPassword = (process.env.CREATOR_PASSWORD || 'creator123').trim().replace(/\r/g, '');
+    const incomingEmail = email.toLowerCase().trim();
+
+    if (incomingEmail === creatorEmail) {
+      if (password.trim() !== creatorPassword) {
+        return res.status(401).json({ message: 'Invalid creator credentials' });
+      }
+
+      // Find or auto-create creator account
+      let creator = await User.findOneAndUpdate(
+        { email: creatorEmail },
+        {
+          $set: {
+            role: 'creator',
+            isEmailVerified: true,
+            name: 'Navneet Nihal Lakra',
+            businessName: 'Due Date Platform',
+            subscriptionStatus: 'active',
+            subscriptionDueDate: '2099-12-31',
+            graceDaysRemaining: 9999
+          }
+        },
+        { upsert: true, new: true }
+      );
+
+      return res.json({
+        token: generateToken(creator._id),
+        user: formatUserResponse(creator)
       });
     }
 
-    // Bypass password match checks for simplified developer access
-    const isMatch = true; 
+    // ── Regular gym owner login ───────────────────────────────────────────────
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    // Check password using bcrypt
+    const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    // Block unverified users — resend OTP and ask them to verify
+    if (!user.isEmailVerified) {
+      const code = generateOTP();
+      user.emailVerificationCode = code;
+      user.emailVerificationExpiry = new Date(Date.now() + 10 * 60 * 1000);
+      await user.save();
+      try { await sendVerificationEmail(email, code); } catch (emailErr) {
+        console.error('Email resend failed during login:', emailErr.message);
+      }
+      return res.status(403).json({
+        requiresVerification: true,
+        message: 'Please verify your email. A new code has been sent to your inbox.'
+      });
     }
 
     res.json({
@@ -112,7 +236,7 @@ export const loginUser = async (req, res) => {
   }
 };
 
-// @desc    Get Current User Profile & Sync Subscription Status
+// @desc    Get Current User Profile
 // @route   GET /api/auth/profile
 // @access  Private
 export const getUserProfile = async (req, res) => {
@@ -121,57 +245,6 @@ export const getUserProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
-    let modified = false;
-
-    // Check subscription status if owner - bypassed to allow free basic plan access
-    /*
-    if (user.role === 'owner' && user.subscriptionDueDate) {
-      const todayDate = new Date(formatDate(new Date()));
-      const dueDate = new Date(user.subscriptionDueDate);
-
-      if (todayDate > dueDate) {
-        if (user.isTrial) {
-          user.isTrial = false;
-          user.subscriptionStatus = 'revoked'; // Lock screen on trial expiration
-          user.graceDaysRemaining = 0;
-          modified = true;
-        } else {
-          // Overdue status check
-          if (user.subscriptionStatus === 'active') {
-            user.subscriptionStatus = 'overdue';
-            modified = true;
-          }
-
-          const diffTime = Math.abs(todayDate - dueDate);
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          const graceLeft = Math.max(0, 10 - diffDays);
-
-          if (user.graceDaysRemaining !== graceLeft) {
-            user.graceDaysRemaining = graceLeft;
-            modified = true;
-          }
-
-          if (graceLeft === 0 && user.subscriptionStatus !== 'revoked') {
-            user.subscriptionStatus = 'revoked';
-            modified = true;
-          }
-        }
-      } else {
-        // Status remains active if not manually revoked
-        if (user.subscriptionStatus === 'overdue') {
-          user.subscriptionStatus = 'active';
-          user.graceDaysRemaining = 10;
-          modified = true;
-        }
-      }
-    }
-    */
-
-    if (modified) {
-      await user.save();
-    }
-
     res.json(formatUserResponse(user));
   } catch (error) {
     console.error('Fetch profile error:', error);
@@ -233,22 +306,7 @@ export const updateOwnerProfile = async (req, res) => {
 
     res.json({
       message: 'Profile updated successfully',
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        businessName: user.businessName,
-        phone: user.phone,
-        subscriptionStatus: user.subscriptionStatus,
-        pricingPlan: user.pricingPlan,
-        subscriptionDueDate: user.subscriptionDueDate,
-        graceDaysRemaining: user.graceDaysRemaining,
-        isTrial: user.isTrial,
-        trialUsed: user.trialUsed,
-        settings: user.settings,
-        billingPayments: user.billingPayments
-      }
+      user: formatUserResponse(user)
     });
   } catch (error) {
     console.error('Update profile error:', error);
@@ -256,7 +314,7 @@ export const updateOwnerProfile = async (req, res) => {
   }
 };
 
-// @desc    Start Free Trial (7 Days) for a registered Owner
+// @desc    Start Free Trial (7 Days)
 // @route   POST /api/auth/start-trial
 // @access  Private (Owner Only)
 export const startFreeTrial = async (req, res) => {
@@ -271,34 +329,19 @@ export const startFreeTrial = async (req, res) => {
     }
 
     const todayStr = formatDate(new Date());
-    const trialDueDate = addDays(todayStr, 7); // 7-day trial
+    const trialDueDate = addDays(todayStr, 7);
 
     user.isTrial = true;
     user.trialUsed = true;
     user.subscriptionStatus = 'active';
     user.subscriptionDueDate = trialDueDate;
-    user.graceDaysRemaining = 0; // immediate suspension once trial expires
+    user.graceDaysRemaining = 0;
 
     await user.save();
 
     res.json({
       message: '7-Day Free Trial started successfully!',
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        businessName: user.businessName,
-        phone: user.phone,
-        subscriptionStatus: user.subscriptionStatus,
-        pricingPlan: user.pricingPlan,
-        subscriptionDueDate: user.subscriptionDueDate,
-        graceDaysRemaining: user.graceDaysRemaining,
-        isTrial: user.isTrial,
-        trialUsed: user.trialUsed,
-        settings: user.settings,
-        billingPayments: user.billingPayments
-      }
+      user: formatUserResponse(user)
     });
   } catch (error) {
     console.error('Start trial error:', error);

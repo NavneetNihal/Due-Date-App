@@ -6,7 +6,7 @@ import { sendWhatsAppMessage } from './reminderService.js';
 
 export const checkAndSendReminders = async () => {
   console.log('⏳ Running automated payment reminder scanner...');
-  
+
   const todayStr = formatDate(new Date());
   const sevenDaysBeforeStr = addDays(todayStr, 7);
   const threeDaysOverdueStr = addDays(todayStr, -3);
@@ -49,7 +49,7 @@ export const checkAndSendReminders = async () => {
         const delay = Math.floor(Math.random() * 2000) + 3000;
         console.log(`Waiting ${delay}ms before sending message to ${member.name}...`);
         await new Promise(resolve => setTimeout(resolve, delay));
-        
+
         const success = await sendWhatsAppMessage(member.phoneNumber, fullMessage, qrCode);
         if (success) {
           // Only mark inactive after 10 days overdue (final warning sent)
@@ -71,11 +71,11 @@ export const checkAndSendReminders = async () => {
 
 export const startScheduler = () => {
   console.log('📅 Starting cron scheduler...');
-  
+
   // Run daily at 8:00 AM
   cron.schedule('0 8 * * *', () => {
     checkAndSendReminders();
   });
-  
+
   console.log('📅 Cron scheduler started! Job scheduled daily at 8:00 AM.');
 };

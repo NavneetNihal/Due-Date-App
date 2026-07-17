@@ -75,7 +75,20 @@ const userSchema = new mongoose.Schema({
     paymentMethod: { type: String, default: 'UPI' },
     notes: String,
     upiTxnId: String
-  }]
+  }],
+  // Email verification
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationCode: {
+    type: String,
+    default: null
+  },
+  emailVerificationExpiry: {
+    type: Date,
+    default: null
+  }
 }, {
   timestamps: true
 });
