@@ -88,11 +88,13 @@ export const registerOwner = async (req, res) => {
     });
 
     // Try to send OTP email — if it fails, OTP screen still shows
+    console.log(`🔑 [DEBUG] Registration Verification Code for ${email}: ${code}`);
     let emailSent = true;
     try { await sendVerificationEmail(email, code); } catch (emailErr) {
       emailSent = false;
       console.error('Email send failed:', emailErr.message);
     }
+
 
     res.status(201).json({
       requiresVerification: true,
@@ -372,6 +374,7 @@ export const forgotPassword = async (req, res) => {
     user.resetPasswordExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
     await user.save();
 
+    console.log(`🔑 [DEBUG] Reset Code for ${user.email}: ${code}`);
     let emailSent = true;
     try {
       await sendPasswordResetEmail(user.email, code);
@@ -379,6 +382,7 @@ export const forgotPassword = async (req, res) => {
       emailSent = false;
       console.error('Reset password email failed:', emailErr.message);
     }
+
 
     res.json({
       emailSent,
