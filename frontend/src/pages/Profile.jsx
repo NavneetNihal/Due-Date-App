@@ -127,12 +127,20 @@ function Profile() {
 
 
   const getMessagePreview = () => {
+    let sanitizedPhone = (phone || '9999988888').replace(/\D/g, '');
+    if (sanitizedPhone.length === 10) {
+      sanitizedPhone = '91' + sanitizedPhone;
+    }
+    const waText = encodeURIComponent(`Hi, here is my payment receipt for ${businessName || 'your gym'}`);
+    const waLink = `https://wa.me/${sanitizedPhone}?text=${waText}`;
+
     return `Hello [Member Name], this is a friendly reminder from *${businessName || 'your gym'}*. Your subscription fee of *₹1,000* is due on *2026-06-26*. 
 
-Please pay via UPI using ID: *${upiId || 'your-upi-id'}* (QR attached) and *send a screenshot* of the transaction receipt to this chat to confirm your payment.
+Please pay via UPI using ID: *${upiId || 'your-upi-id'}* (QR attached). After paying, click this link to send the payment screenshot to confirm: ${waLink}
 
 Thank you!`;
   };
+
 
   return (
     <div className="relative min-h-screen pb-12 px-4 sm:px-6 lg:px-8">
@@ -355,18 +363,18 @@ Thank you!`;
 
                     {/* WhatsApp Bubble Frame */}
                     <div className="p-4 bg-slate-950/50 border border-slate-850 rounded-xl flex flex-col items-start">
-                      <div className="w-full max-w-[280px] bg-[#0c241a] border border-[#164330] rounded-xl rounded-tr-none p-2.5 shadow-md self-end text-xs text-slate-200">
+                      <div className="w-full max-w-[280px] bg-[#0c241a] border border-[#164330] rounded-xl rounded-tr-none p-2.5 shadow-md self-end text-xs text-slate-200 break-words">
                         {qrCode ? (
                           <div className="w-full bg-white p-2 rounded-lg border border-slate-200 mb-2 flex flex-col items-center justify-center">
                             <img src={qrCode} alt="UPI QR Code preview" className="max-h-28 object-contain" />
                             <span className="text-[9px] text-slate-500 font-semibold uppercase mt-1 tracking-wider block">UPI QR Code Attachment</span>
                           </div>
                         ) : (
-                          <div className="w-full h-16 border-2 border-dashed border-slate-800 rounded-lg mb-2 flex items-center justify-center text-[10px] text-slate-500 p-2 text-center leading-relaxed">
+                          <div className="w-full h-16 border-2 border-dashed border-slate-800 rounded-lg mb-2 flex items-center justify-center text-[10px] text-slate-550 p-2 text-center leading-relaxed">
                             No QR Code attached. Upload QR above to include it.
                           </div>
                         )}
-                        <p className="whitespace-pre-wrap leading-relaxed">{getMessagePreview()}</p>
+                        <p className="whitespace-pre-wrap leading-relaxed break-all">{getMessagePreview()}</p>
                         <div className="text-[8px] text-slate-550 text-right mt-1 font-semibold flex items-center justify-end gap-0.5">
                           <span>09:15 AM</span>
                           <span className="text-emerald-500">✓✓</span>

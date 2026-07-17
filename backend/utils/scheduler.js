@@ -42,8 +42,18 @@ export const checkAndSendReminders = async () => {
       }
 
       if (messageIntro) {
-        // Build full message template with payment details (matching settings dashboard)
-        const fullMessage = `${messageIntro}\n\nPlease pay via UPI using ID: *${upiId}* (QR attached) and *send a screenshot* of the transaction receipt to this chat to confirm your payment.\n\nThank you!`;
+        // Format owner's phone number for wa.me link
+        const ownerPhone = owner?.phone || '9999988888';
+        let sanitizedPhone = ownerPhone.replace(/\D/g, '');
+        if (sanitizedPhone.length === 10) {
+          sanitizedPhone = '91' + sanitizedPhone;
+        }
+        const waText = encodeURIComponent(`Hi, here is my payment receipt for ${gymName}`);
+        const waLink = `https://wa.me/${sanitizedPhone}?text=${waText}`;
+
+        // Build full message template with payment details & direct WhatsApp link
+        const fullMessage = `${messageIntro}\n\nPlease pay via UPI using ID: *${upiId}* (QR attached). After paying, click this link to send the payment screenshot to confirm: ${waLink}\n\nThank you!`;
+
 
         // Implement anti-spam delay of 3 to 5 seconds per message
         const delay = Math.floor(Math.random() * 2000) + 3000;
